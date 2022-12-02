@@ -34,7 +34,7 @@ wasm_MODE = wasmtime
 # Implementation specific settings
 #
 
-IMPLS = ada ada.2 awk bash basic bbc-basic c c.2 chuck clojure coffee common-lisp cpp crystal cs d dart \
+IMPLS = ada ada.2 awk bash basic bbc-basic c c.2 chuck clojure clojure.2 coffee common-lisp cpp crystal cs d dart \
 	elisp elixir elm erlang es6 factor fantom fennel forth fsharp go groovy gnu-smalltalk \
 	guile haskell haxe hy io janet java java-truffle js jq julia kotlin livescript logo lua make mal \
 	matlab miniMAL nasm nim objc objpascal ocaml perl perl6 php picolisp pike plpgsql \
@@ -114,6 +114,7 @@ c_STEP_TO_PROG =             impls/c/$($(1))
 c.2_STEP_TO_PROG =           impls/c.2/$($(1))
 chuck_STEP_TO_PROG =         impls/chuck/$($(1)).ck
 clojure_STEP_TO_PROG =       $(clojure_STEP_TO_PROG_$(clojure_MODE))
+clojure.2_STEP_TO_PROG =     impls/clojure.2/$($(1)).clj
 coffee_STEP_TO_PROG =        impls/coffee/$($(1)).coffee
 common-lisp_STEP_TO_PROG =   impls/common-lisp/$($(1))
 cpp_STEP_TO_PROG =           impls/cpp/$($(1))
