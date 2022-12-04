@@ -1,2 +1,7 @@
 {:aliases
-  {:step0_repl {:exec-fn mal.s0/main}}}
+  {:step0_repl {:exec-fn mal.s0/main}
+   :test {:extra-paths ["test"]
+          :extra-deps {io.github.cognitect-labs/test-runner
+                        {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+          :main-opts ["-m" "cognitect.test-runner"]
+          :exec-fn cognitect.test-runner.api/test}}}
