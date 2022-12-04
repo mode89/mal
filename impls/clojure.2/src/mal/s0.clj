@@ -1,5 +1,3 @@
-#!/usr/bin/env clj
-
 (ns mal.s0)
 
 (defn READ [input]
