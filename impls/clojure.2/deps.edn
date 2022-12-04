@@ -1,0 +1,2 @@
+{:aliases
+  {:step0_repl {:exec-fn mal.s0/main}}}

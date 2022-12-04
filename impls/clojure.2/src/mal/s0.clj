@@ -1,5 +1,7 @@
 #!/usr/bin/env clj
 
+(ns mal.s0)
+
 (defn READ [input]
   input)
 
@@ -15,12 +17,10 @@
       EVAL
       PRINT))
 
-(defn main []
+(defn main [& _]
   (loop []
     (print "user> ")
     (flush)
     (when-let [input (read-line)]
       (-> input rep println)
       (recur))))
-
-(main)
