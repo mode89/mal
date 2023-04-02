@@ -1,0 +1,1 @@
+{:lint-as {mal.parsing/let-bind clojure.core/let}}
