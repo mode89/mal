@@ -1,6 +1,8 @@
 (ns mal.parsing
   (:refer-clojure :exclude [map sequence try]))
 
+(defrecord Parser [function])
+
 (defrecord Value
   [value ;; The value returned by the parser.
    state ;; The remaining state to be parsed.
@@ -11,23 +13,30 @@
    state ;; The remaining state to be parsed.
    ])
 
-(defn parse
+(defmacro make-parser [args & body]
+  `(mal.parsing/->Parser
+     (fn [~@args]
+       ~@body)))
+
+(defn run
   "Parses the given string using the given parser and returns the result of
   the parsing. A parser is a function that takes a state and returns
   a Result record."
   [parser state]
-  (parser state))
+  (assert (instance? Parser parser))
+  (assert (fn? (:function parser)))
+  ((:function parser) state))
 
 (defn return
   "Returns a parser that always succeeds with the given value."
   [x]
-  (fn [state]
+  (make-parser [state]
     (->Value x state)))
 
 (defn fail
   "Returns a parser that always fails with the given message."
   [message]
-  (fn [state]
+  (make-parser [state]
     (->ParseError message state)))
 
 (defn label
@@ -35,8 +44,8 @@
   parse was successful. If the parse was successful, the returned parser
   succeeds. Otherwise, the returned parser fails with the given message."
   [message parser]
-  (fn [state]
-    (let [result (parser state)]
+  (make-parser [state]
+    (let [result (run parser state)]
       (if (instance? Value result)
         result
         (->ParseError message (:state result))))))
@@ -46,11 +55,11 @@
   by the given parser. The function must return a parser. If the given
   parser fails, the returned parser fails."
   [parser f]
-  (fn [state]
-    (let [result (parser state)]
+  (make-parser [state]
+    (let [result (run parser state)]
       (if (instance? Value result)
         (let [parser2 (f (:value result))]
-          (parser2 (:state result)))
+          (run parser2 (:state result)))
         result))))
 
 (defn map
@@ -61,8 +70,8 @@
   always returns the given value.
   "
   ([f parser]
-    (fn [state]
-      (let [result (parser state)]
+    (make-parser [state]
+      (let [result (run parser state)]
         (if (instance? Value result)
           (->Value (f (:value result)) (:state result))
           result))))
@@ -86,8 +95,8 @@
   "Returns a parser that behaves like the given parser, except that it
   doesn't consume any input if the given parser fails."
   [parser]
-  (fn [state]
-    (let [result (parser state)]
+  (make-parser [state]
+    (let [result (run parser state)]
       (if (instance? Value result)
         result
         (->ParseError (:message result) state)))))
@@ -98,15 +107,15 @@
   returned. If the first parser fails without consuming any input,
   then the second parser is tried."
   [parser1 parser2]
-  (fn [state]
-    (let [result1 (parser1 state)]
+  (make-parser [state]
+    (let [result1 (run parser1 state)]
       (if (instance? Value result1)
         result1
         (if (not= state (:state result1))
           ; The first parser consumed input, so we can't try the second
           result1
           ; The first parser didn't consume input, so we can try the second
-          (let [result2 (parser2 state)]
+          (let [result2 (run parser2 state)]
             (if (instance? Value result2)
               ; The second parser succeeded
               result2
@@ -131,10 +140,10 @@
   If keyword argument :till is given, the parser will stop when
   the given end-parser succeeds."
   ([parser]
-    (fn [state0]
+    (make-parser [state0]
       (loop [values []
              state state0]
-        (let [result (parser state)]
+        (let [result (run parser state)]
           (if (instance? Value result)
             (recur (conj values (:value result)) (:state result))
             (if (= state (:state result))
@@ -144,10 +153,10 @@
     (assert (= _till :till) "The second argument must be :till")
     (let [end-marker (Object.)
           end-or-value (alt (map end-parser :to end-marker) parser)]
-      (fn [state0]
+      (make-parser [state0]
         (loop [values []
                state state0]
-          (let [result (end-or-value state)]
+          (let [result (run end-or-value state)]
             (if (instance? Value result)
               (if (= (:value result) end-marker)
                 (->Value values (:state result))
@@ -158,9 +167,9 @@
   "Returns a parser that applies the given parser zero or more times,
   skipping the values returned by the parser."
   [parser]
-  (fn [state0]
+  (make-parser [state0]
     (loop [state state0]
-      (let [result (parser state)]
+      (let [result (run parser state)]
         (if (instance? Value result)
           (recur (:state result))
           (->Value nil state))))))
@@ -169,14 +178,14 @@
   "Returns a parser that applies each parser in the given sequence. Returns
   a vector of the values returned by the parsers."
   [parsers]
-  (fn [state0]
+  (make-parser [state0]
     (loop [remaining-parsers parsers
            values []
            state state0]
       (if (empty? remaining-parsers)
         (->Value values state)
         (let [parser (first remaining-parsers)
-              result (parser state)]
+              result (run parser state)]
           (if (instance? Value result)
             (recur (rest remaining-parsers)
                    (conj values (:value result))
