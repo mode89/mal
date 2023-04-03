@@ -205,3 +205,10 @@
                 `(bind ~bvalue (fn [~bname] ~inner)))
               `(do ~@body)))]
     (recurse bindings)))
+
+(defn not-followed-by [parser]
+  (make-parser [state]
+    (let [result (run parser state)]
+      (if (instance? Value result)
+        (->ParseError (str "wrong input") state)
+        (->Value nil state)))))

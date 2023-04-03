@@ -150,3 +150,9 @@
     (is (= (p '(1 2)) (failure "any-element" '())))
     (is (= (p '(1 2 3)) (success 6 '())))
     (is (= (p '(1 2 4 5)) (success 7 '(5))))))
+
+(deftest not-followed-by
+  (let [p (partial pa/run (pa/not-followed-by (element 1)))]
+    (is (= (p '()) (success nil '())))
+    (is (= (p '(2)) (success nil '(2))))
+    (is (= (p '(1)) (failure "wrong input" '(1))))))
