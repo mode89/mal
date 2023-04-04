@@ -160,8 +160,12 @@
       (pa/run parser state))))
 
 (defn tokenize [stream]
-  (-> (pa/let-bind [_ whitespaces
-                    parsed-tokens (pa/many token :till end-of-stream)]
-        (pa/return parsed-tokens))
-      (run stream)
-      :value))
+  (let [parser (pa/let-bind [_ whitespaces
+                             parsed-tokens (pa/many token
+                                             :till end-of-stream)]
+                 (pa/return parsed-tokens))
+        result (run parser stream)]
+    (if (contains? result :error)
+      (throw (ex-info "Failed to tokenize"
+               (select-keys result [:error :line :column])))
+      (:value result))))

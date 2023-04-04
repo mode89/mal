@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [comment])
   (:require [clojure.string :refer [join]]
             [clojure.test :refer [deftest is]]
-            [mal.lexer :as l]))
+            [mal.lexer :as l])
+  (:import [clojure.lang ExceptionInfo]))
 
 (deftest any-char
   (let [p (partial l/run l/any-char)]
@@ -159,4 +160,8 @@
           (l/->Token "h" 4 8)
           (l/->Token 42 4 12)
           (l/->Token \} 4 14)
-          (l/->Token \) 4 15)])))
+          (l/->Token \) 4 15)]))
+  (is (= (try (l/tokenize " 42x ")
+           (catch ExceptionInfo e
+             [(ex-message e) (ex-data e)]))
+         ["Failed to tokenize" {:error "number" :line 1 :column 4}])))
