@@ -1,1 +1,2 @@
-{:lint-as {mal.parsing/let-bind clojure.core/let}}
+{:lint-as {mal.parsing/let-bind clojure.core/let
+           mal.parsing/make-parser clojure.core/fn}}
