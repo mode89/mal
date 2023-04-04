@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
+pushd $(dirname "$0") > /dev/null
 exec clj -X:${STEP:-stepA_mal} "$@"
+popd > /dev/null
