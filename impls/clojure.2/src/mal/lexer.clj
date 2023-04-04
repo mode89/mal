@@ -64,18 +64,19 @@
 (def tilde (character \~))
 (def at (character \@))
 
-(def whitespace
-  (pa/label "whitespace"
-    (one-of " \n\t,")))
-
-(def whitespaces
-  (pa/skip-many whitespace))
-
 (def comment
   (pa/let-bind
     [_ semicolon
      text (pa/many any-char :till (pa/choice newline end-of-stream))]
     (pa/return (->Comment (apply str text)))))
+
+(def whitespace
+  (pa/label "whitespace"
+    (one-of " \n\t,")))
+
+(def whitespaces
+  (pa/skip-many
+    (pa/choice whitespace comment)))
 
 (def escape-sequence
   (pa/label "escape sequence"
@@ -146,7 +147,6 @@
 (def token-types
   [special-character
    symbol
-   comment
    string-literal
    number])
 

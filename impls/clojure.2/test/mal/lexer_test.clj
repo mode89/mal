@@ -126,30 +126,25 @@
     (is (= (p "some-symbol\n\n\t")
            {:value (l/->Token (l/->Symbol "some-symbol") 1 1)
             :remainder '() :line 3 :column 2}))
-    (is (= (p "; some comment\n,\n\t\n")
-           {:value (l/->Token (l/->Comment " some comment") 1 1)
-            :remainder '() :line 4 :column 1}))
     (is (= (p "\"some\\\"st\nring\"\t, \n, ")
            {:value (l/->Token "some\"st\nring" 1 1)
             :remainder '() :line 3 :column 3}))
-    (is (= (p "1234, ") {:value (l/->Token 1234 1 1)
-                         :remainder '() :line 1 :column 7}))
+    (is (= (p "1234, ; number\n ,\t") {:value (l/->Token 1234 1 1)
+                                       :remainder '() :line 2 :column 4}))
     (is (= (p "42x ") {:error "number",
                        :remainder '(\x \space) :line 1 :column 3}))))
 
 (deftest tokenize
   (is (= (l/tokenize "") []))
   (is (= (l/tokenize " \n\t ") []))
-  (is (= (l/tokenize " ,; some comments \n\t,")
-         [(l/->Token (l/->Comment " some comments ") 1 3)]))
+  (is (= (l/tokenize " ,; some comments \n\t,") []))
   (is (= (l/tokenize
            (join \newline
              ["  ; some tokens"
               "(a 'b {c d,"
               "       e [f g]"
               "       \"h\" 42})"]))
-         [(l/->Token (l/->Comment " some tokens") 1 3)
-          (l/->Token \( 2 1)
+         [(l/->Token \( 2 1)
           (l/->Token (l/->Symbol "a") 2 2)
           (l/->Token \' 2 4)
           (l/->Token (l/->Symbol "b") 2 5)
