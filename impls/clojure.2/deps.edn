@@ -1,5 +1,6 @@
 {:aliases
   {:step0_repl {:exec-fn mal.s0/main}
+   :step1_read_print {:exec-fn mal.s1/main}
    :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.7"}}
            :main-opts ["-m" "nrepl.cmdline" "--middleware"
                        "[cider.nrepl/cider-middleware]"]}
