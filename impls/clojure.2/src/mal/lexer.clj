@@ -66,7 +66,7 @@
 
 (def whitespace
   (pa/label "whitespace"
-    (pa/choice space newline tab comma)))
+    (one-of " \n\t,")))
 
 (def whitespaces
   (pa/skip-many whitespace))
