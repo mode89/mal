@@ -25,5 +25,5 @@
       (try
         (-> input rep println)
         (catch Exception e
-          (println "Error: " (.getMessage e))))
+          (.printStackTrace e)))
       (recur))))
