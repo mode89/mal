@@ -156,3 +156,9 @@
     (is (= (p '()) (success nil '())))
     (is (= (p '(2)) (success nil '(2))))
     (is (= (p '(1)) (failure "wrong input" '(1))))))
+
+(deftest predict
+  (let [p (partial pa/run (pa/predict (element 1)))]
+    (is (= (p '()) (failure "element: 1" '())))
+    (is (= (p '(2)) (failure "element: 1" '(2))))
+    (is (= (p '(1)) (success 1 '(1))))))

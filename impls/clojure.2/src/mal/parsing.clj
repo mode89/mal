@@ -212,3 +212,10 @@
       (if (instance? Value result)
         (->ParseError (str "wrong input") state)
         (->Value nil state)))))
+
+(defn predict [parser]
+  (make-parser [state]
+    (let [result (run parser state)]
+      (if (instance? Value result)
+        (assoc result :state state)
+        result))))
