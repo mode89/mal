@@ -162,3 +162,9 @@
     (is (= (p '()) (failure "element: 1" '())))
     (is (= (p '(2)) (failure "element: 1" '(2))))
     (is (= (p '(1)) (success 1 '(1))))))
+
+(deftest maybe
+  (let [p (partial pa/run (pa/maybe (pair 1 2)))]
+    (is (= (p '(1 2)) (success '(1 2) '())))
+    (is (= (p '(2 3)) (success nil '(2 3))))
+    (is (= (p '(1 3)) (failure "element: 2" '(3))))))

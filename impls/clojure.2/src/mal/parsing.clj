@@ -219,3 +219,8 @@
       (if (instance? Value result)
         (assoc result :state state)
         result))))
+
+(defn maybe
+  "Returns a parser that applies the given parser zero or one times."
+  [parser]
+  (alt parser (return nil)))
