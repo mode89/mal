@@ -206,14 +206,21 @@
               `(do ~@body)))]
     (recurse bindings)))
 
-(defn not-followed-by [parser]
+(defn not-followed-by
+  "Returns a parser that only succeeds if the given parser fails. Does not
+  consume any input."
+  [parser]
   (make-parser [state]
     (let [result (run parser state)]
       (if (instance? Value result)
         (->ParseError (str "wrong input") state)
         (->Value nil state)))))
 
-(defn predict [parser]
+(defn predict
+  "Returns a parser that parses the given parser without consuming any
+  input. If the given parser fails and consumes some input, so does
+  the returned parser."
+  [parser]
   (make-parser [state]
     (let [result (run parser state)]
       (if (instance? Value result)
