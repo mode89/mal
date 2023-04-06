@@ -26,7 +26,7 @@
            (pa/->ParseError "atom" [(l/->Token \[ 1 1)])))))
 
 (deftest list-form
-  (let [p (partial pa/run (r/list-form))]
+  (let [p (partial pa/run r/list-form)]
     (is (= (p [(l/->Token \( 1 1)
                (l/->Token 1 1 2)
                (l/->Token "2" 1 4)
@@ -46,7 +46,7 @@
               (l/->Token 1 1 2)])))))
 
 (deftest vector-form
-  (let [p (partial pa/run (r/vector-form))]
+  (let [p (partial pa/run r/vector-form)]
     (is (= (p [(l/->Token \[ 1 1)
                (l/->Token 1 1 2)
                (l/->Token "2" 1 4)

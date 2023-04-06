@@ -36,36 +36,39 @@
           (fn [t] (:value t))
           any-token)))))
 
-(declare list-form)
-(declare vector-form)
+(declare form)
 
-(defn form []
-  (pa/choice
-    (list-form)
-    (vector-form)
-    atom))
-
-(defn list-form []
+(def list-form
   (let [unbalanced-list (pa/let-bind [_ end-of-stream]
                           (pa/fail "unbalanced list"))
         left-paren (token \( )
         right-paren (token \) )
         element (pa/let-bind [_ (pa/maybe unbalanced-list)]
-                  (form))]
-    (pa/let-bind [_ left-paren
-                  forms (pa/many element :till right-paren)]
-      (pa/return (into '() (reverse forms))))))
+                  (form))
+        elements (pa/many element :till right-paren)
+        reverse-elements (pa/map
+                           (fn [fs]
+                             (into '() (reverse fs)))
+                           elements)]
+    (pa/let-bind [_ left-paren]
+      reverse-elements)))
 
-(defn vector-form []
+(def vector-form
   (let [unbalanced-vector (pa/let-bind [_ end-of-stream]
                              (pa/fail "unbalanced vector"))
         left-bracket (token \[)
         right-bracket (token \])
         element (pa/let-bind [_ (pa/maybe unbalanced-vector)]
-                  (form))]
-    (pa/let-bind [_ left-bracket
-                  forms (pa/many element :till right-bracket)]
-      (pa/return forms))))
+                  (form))
+        elements (pa/many element :till right-bracket)]
+    (pa/let-bind [_ left-bracket]
+      elements)))
+
+(defn form []
+  (pa/choice
+    list-form
+    vector-form
+    atom))
 
 (defn read-string [string]
   (let [tokens (l/tokenize string)
