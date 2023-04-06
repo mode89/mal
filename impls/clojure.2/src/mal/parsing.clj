@@ -101,7 +101,7 @@
     (let [result (run parser state)]
       (if (instance? Value result)
         result
-        (->ParseError (:message result) state)))))
+        (assoc result :state state)))))
 
 (defn alt
   "This combinator implements choice. It applies the given parsers in order.
@@ -121,14 +121,12 @@
             (if (instance? Value result2)
               ; The second parser succeeded
               result2
-              (let [message (if (= state (:state result2))
-                              ; The second parser failed without consuming
-                              ; any input
-                              (str (:message result1) " or "
-                                   (:message result2))
-                              ; The second parser consumed some input
-                              (:message result2))]
-                (->ParseError message (:state result2))))))))))
+              (if (= state (:state result2))
+                ; The second parser failed without consuming any input
+                (assoc result2 :message
+                  (str (:message result1) " or " (:message result2)))
+                ; The second parser consumed some input
+                result2))))))))
 
 (defn choice
   "Returns a parser that tries each parser in the given sequence. If all
