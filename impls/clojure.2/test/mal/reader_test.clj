@@ -3,9 +3,9 @@
             [clojure.test :refer [deftest is]]
             [mal.lexer :as l]
             [mal.parsing :as pa]
-            [mal.reader :as r])
-  (:import [clojure.lang ExceptionInfo]
-           [mal.parsing ParseError]))
+            [mal.reader :as r]
+            [mal.test.utils :refer [catch-ex-info]])
+  (:import [mal.parsing ParseError]))
 
 (deftest any-token
   (let [p (partial pa/run r/any-token)]
@@ -60,10 +60,9 @@
            (catch ExceptionInfo e
              [(ex-message e) (select-keys (ex-data e) [:next-token])]))
          ["Failed to parse" {:next-token nil}]))
-  (is (= (try (r/read-string "42x")
-           (catch ExceptionInfo e
-             [(ex-message e) (ex-data e)]))
-         ["Failed to tokenize" {:error "number" :line 1 :column 3}]))
+  (is (= (catch-ex-info (r/read-string "42x"))
+         ["Failed to tokenize"
+          {:error "invalid number" :line 1 :column 3}]))
   (is (= (r/read-string
            (join \newline
              [" ; some function "

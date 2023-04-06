@@ -79,14 +79,14 @@
     (pa/choice whitespace comment)))
 
 (def escape-sequence
-  (pa/label "escape sequence"
-    (pa/let-bind [_ backslash
-                  c (pa/choice
+  (pa/let-bind [_ backslash
+                c (pa/label "escape character"
+                    (pa/choice
                       (pa/map (character \n) :to \newline)
                       (pa/map (character \t) :to \tab)
                       (character \\ )
-                      (character \" ))]
-      (pa/return c))))
+                      (character \" )))]
+    (pa/return c)))
 
 (def string-literal
   (pa/label "string literal"
@@ -134,11 +134,12 @@
 
 (def integer
   (pa/let-bind [digits (pa/many digit)
-                _ (pa/not-followed-by symbol-rest-char)]
+                _ (pa/label "invalid number"
+                    (pa/not-followed-by symbol-rest-char))]
     (let [number (integer-from-string (apply str digits))]
       (if (some? number)
         (pa/return number)
-        (pa/fail "integer")))))
+        (pa/fail "invalid number")))))
 
 (def number
   (pa/label "number"

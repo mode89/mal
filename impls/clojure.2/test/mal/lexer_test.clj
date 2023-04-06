@@ -2,8 +2,8 @@
   (:refer-clojure :exclude [comment])
   (:require [clojure.string :refer [join]]
             [clojure.test :refer [deftest is]]
-            [mal.lexer :as l])
-  (:import [clojure.lang ExceptionInfo]))
+            [mal.lexer :as l]
+            [mal.test.utils :refer [catch-ex-info]]))
 
 (deftest any-char
   (let [p (partial l/run l/any-char)]
@@ -101,13 +101,13 @@
   (let [p (partial l/run l/integer)]
     (is (= (p "1") {:value 1 :remainder '() :line 1 :column 2}))
     (is (= (p "12345") {:value 12345 :remainder '() :line 1 :column 6}))
-    (is (= (p "12345a") {:error "wrong input"
+    (is (= (p "12345a") {:error "invalid number"
                          :remainder '(\a) :line 1 :column 6}))
     (is (= (p "12345)") {:value 12345
                          :remainder '( \) ) :line 1 :column 6}))
     (is (= (p "2147483647") {:value 2147483647
                              :remainder '() :line 1 :column 11}))
-    (is (= (p "2147483648") {:error "integer"
+    (is (= (p "2147483648") {:error "invalid number"
                              :remainder '() :line 1 :column 11}))))
 
 (deftest symbols
@@ -132,7 +132,7 @@
             :remainder '() :line 3 :column 3}))
     (is (= (p "1234, ; number\n ,\t") {:value (l/->Token 1234 1 1)
                                        :remainder '() :line 2 :column 4}))
-    (is (= (p "42x ") {:error "number",
+    (is (= (p "42x ") {:error "invalid number",
                        :remainder '(\x \space) :line 1 :column 3}))))
 
 (deftest tokenize
@@ -161,7 +161,5 @@
           (l/->Token 42 4 12)
           (l/->Token \} 4 14)
           (l/->Token \) 4 15)]))
-  (is (= (try (l/tokenize " 42x ")
-           (catch ExceptionInfo e
-             [(ex-message e) (ex-data e)]))
-         ["Failed to tokenize" {:error "number" :line 1 :column 4}])))
+  (is (= (catch-ex-info (l/tokenize " 42x "))
+         ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}])))

@@ -40,9 +40,10 @@
     (is (= (p '(1)) (failure "nope" '(1))))))
 
 (deftest label
-  (let [p (partial pa/run (pa/label "foo" (element 42)))]
-    (is (= (p '(42)) (success 42 '())))
-    (is (= (p '(43)) (failure "foo" '(43))))))
+  (let [p (partial pa/run (pa/label "foo" (pair 1 2)))]
+    (is (= (p '(1 2)) (success '(1 2) '())))
+    (is (= (p '(2 2)) (failure "foo" '(2 2))))
+    (is (= (p '(1 3)) (failure "element: 2" '(3))))))
 
 (deftest bind
   (let [p (partial pa/run

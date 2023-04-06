@@ -40,15 +40,17 @@
     (->ParseError message state)))
 
 (defn label
-  "Returns a parser that applies the given parser and then checks if the
-  parse was successful. If the parse was successful, the returned parser
-  succeeds. Otherwise, the returned parser fails with the given message."
+  "Returned parser behaves the same as the given parser, but if the given
+  parser fails without consuming any input, the returned parser fails with
+  the given message."
   [message parser]
   (make-parser [state]
     (let [result (run parser state)]
       (if (instance? Value result)
         result
-        (->ParseError message (:state result))))))
+        (if (= state (:state result))
+          (assoc result :message message)
+          result)))))
 
 (defn bind
   "Returns a parser that applies the given function to the value returned
