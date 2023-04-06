@@ -56,10 +56,8 @@
 
 (deftest read-strings
   (is (= (r/read-string "42") 42))
-  (is (= (try (r/read-string "(")
-           (catch ExceptionInfo e
-             [(ex-message e) (select-keys (ex-data e) [:next-token])]))
-         ["Failed to parse" {:next-token nil}]))
+  (is (= (catch-ex-info (r/read-string "("))
+         ["Failed to parse" {:message "unbalanced list" :next-token {}}]))
   (is (= (catch-ex-info (r/read-string "42x"))
          ["Failed to tokenize"
           {:error "invalid number" :line 1 :column 3}]))
@@ -78,4 +76,8 @@
                (list (l/->Symbol "+")
                      (l/->Symbol "a")
                      (l/->Symbol "b")
-                     (l/->Symbol "c"))))))
+                     (l/->Symbol "c")))))
+  (is (= (catch-ex-info (r/read-string "(1 2"))
+         ["Failed to parse" {:message "unbalanced list" :next-token {}}]))
+  (is (= (catch-ex-info (r/read-string "[1 2"))
+         ["Failed to parse" {:message "unbalanced vector" :next-token {}}])))

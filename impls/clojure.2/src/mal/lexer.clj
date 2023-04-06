@@ -89,11 +89,13 @@
     (pa/return c)))
 
 (def string-literal
-  (pa/label "string literal"
-    (pa/let-bind
-      [_ double-quote
-       cs (pa/many (pa/choice escape-sequence any-char)
-            :till double-quote)]
+  (let [unbalanced-string (pa/let-bind [_ end-of-stream]
+                            (pa/fail "unbalanced string"))
+        element (pa/let-bind [_ (pa/maybe unbalanced-string)]
+                  (pa/choice escape-sequence any-char))
+        characters (pa/many element :till double-quote)]
+    (pa/let-bind [_ double-quote
+                  cs characters]
       (pa/return (apply str cs)))))
 
 (def special-character

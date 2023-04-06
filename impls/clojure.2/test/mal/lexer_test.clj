@@ -70,14 +70,14 @@
     (is (= (p [\\ \t]) {:value \tab :remainder '() :line 1 :column 3}))
     (is (= (p [\\ \"]) {:value \" :remainder '() :line 1 :column 3}))
     (is (= (p "\\\\") {:value \\ :remainder '() :line 1 :column 3}))
-    (is (= (p [\\ \1]) {:error "escape sequence"
+    (is (= (p [\\ \1]) {:error "escape character"
                         :remainder '(\1) :line 1 :column 2}))))
 
 (deftest string-literal
   (let [p (partial l/run l/string-literal)]
     (is (= (p [\" \"]) {:value "" :remainder '() :line 1 :column 3}))
     (is (= (p [\"])
-           {:error "string literal" :remainder '() :line 1 :column 2}))
+           {:error "unbalanced string" :remainder nil :line 1 :column 2}))
     (is (= (p [\" \1 \"]) {:value "1" :remainder '() :line 1 :column 4}))
     (is (= (p [\" \1 \newline \2 \"])
            {:value "1\n2" :remainder '() :line 2 :column 3}))
@@ -162,4 +162,7 @@
           (l/->Token \} 4 14)
           (l/->Token \) 4 15)]))
   (is (= (catch-ex-info (l/tokenize " 42x "))
-         ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}])))
+         ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}]))
+  (is (= (catch-ex-info (l/tokenize "\"abc"))
+         ["Failed to tokenize"
+          {:error "unbalanced string" :line 1 :column 5}])))

@@ -11,6 +11,12 @@
       (pa/->ParseError "token" tokens)
       (pa/->Value (first tokens) (rest tokens)))))
 
+(def end-of-stream
+  (pa/make-parser [tokens]
+    (if (empty? tokens)
+      (pa/->Value :end-of-stream nil)
+      (pa/->ParseError "expected end of stream" tokens))))
+
 (defn token [value]
   (pa/label (str "token '" value "'")
     (pa/try
@@ -40,14 +46,26 @@
     atom))
 
 (defn list-form []
-  (pa/let-bind [_ (token \( )
-                forms (pa/many (form) :till (token \) ))]
-    (pa/return (into '() (reverse forms)))))
+  (let [unbalanced-list (pa/let-bind [_ end-of-stream]
+                          (pa/fail "unbalanced list"))
+        left-paren (token \( )
+        right-paren (token \) )
+        element (pa/let-bind [_ (pa/maybe unbalanced-list)]
+                  (form))]
+    (pa/let-bind [_ left-paren
+                  forms (pa/many element :till right-paren)]
+      (pa/return (into '() (reverse forms))))))
 
 (defn vector-form []
-  (pa/let-bind [_ (token \[ )
-                forms (pa/many (form) :till (token \] ))]
-    (pa/return forms)))
+  (let [unbalanced-vector (pa/let-bind [_ end-of-stream]
+                             (pa/fail "unbalanced vector"))
+        left-bracket (token \[)
+        right-bracket (token \])
+        element (pa/let-bind [_ (pa/maybe unbalanced-vector)]
+                  (form))]
+    (pa/let-bind [_ left-bracket
+                  forms (pa/many element :till right-bracket)]
+      (pa/return forms))))
 
 (defn read-string [string]
   (let [tokens (l/tokenize string)
@@ -56,5 +74,5 @@
       Value (:value result)
       ParseError (throw
                    (ex-info "Failed to parse"
-                     {:expected (:message result)
-                      :next-token (first (:state result))})))))
+                     {:message (:message result)
+                      :next-token (->> result :state first (into {}))})))))
