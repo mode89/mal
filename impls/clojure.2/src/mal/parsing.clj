@@ -1,6 +1,8 @@
 (ns mal.parsing
   (:refer-clojure :exclude [map sequence try]))
 
+; Parser is a function that takes a state and returns the result of the
+; parsing along with the remaining state to be parsed.
 (defrecord Parser [function])
 
 (defrecord Value
@@ -20,8 +22,7 @@
 
 (defn run
   "Parses the given string using the given parser and returns the result of
-  the parsing. A parser is a function that takes a state and returns
-  a Result record."
+  the parsing."
   [parser state]
   (assert (instance? Parser parser))
   (assert (fn? (:function parser)))
