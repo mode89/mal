@@ -13,4 +13,6 @@
   (is (= (p/pr-str "abc\"def") "\"abc\\\"def\""))
   (is (= (p/pr-str "a\nb") "\"a\\nb\""))
   (is (= (p/pr-str "a\tb") "\"a\\tb\""))
-  (is (= (p/pr-str "a\\b") "\"a\\\\b\"")))
+  (is (= (p/pr-str "a\\b") "\"a\\\\b\""))
+  (is (= (p/pr-str {}) "{}"))
+  (is (= (p/pr-str {1 2 3 4}) "{1 2 3 4}")))

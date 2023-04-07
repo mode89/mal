@@ -77,6 +77,14 @@
                      (l/->Symbol "a")
                      (l/->Symbol "b")
                      (l/->Symbol "c")))))
+  (is (= (r/read-string "{}") {}))
+  (is (= (r/read-string "{1 2}") {1 2}))
+  (is (= (catch-ex-info (r/read-string "{1 2"))
+         ["Failed to parse" {:message "unbalanced map" :next-token {}}]))
+  (is (= (catch-ex-info (r/read-string "{1 2 3}"))
+         ["Failed to parse"
+          {:message "map literal must contain an even number of forms"
+           :next-token {}}]))
   (is (= (catch-ex-info (r/read-string "(1 2"))
          ["Failed to parse" {:message "unbalanced list" :next-token {}}]))
   (is (= (catch-ex-info (r/read-string "[1 2"))

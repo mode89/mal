@@ -64,6 +64,20 @@
     (pa/let-bind [_ left-bracket]
       elements)))
 
+(def hash-map-form
+  (let [unbalanced-map (pa/let-bind [_ end-of-stream]
+                         (pa/fail "unbalanced map"))
+        left-brace (token \{)
+        right-brace (token \})
+        element (pa/let-bind [_ (pa/maybe unbalanced-map)]
+                  (form))
+        elements (pa/many element :till right-brace)]
+    (pa/let-bind [_ left-brace
+                  elems elements]
+      (if (even? (count elems))
+        (pa/return (into {} (map vec (partition 2 elems))))
+        (pa/fail "map literal must contain an even number of forms")))))
+
 (def quote-form
   (pa/let-bind [_ (token \')]
     (pa/map
@@ -96,6 +110,7 @@
   (pa/choice
     list-form
     vector-form
+    hash-map-form
     quote-form
     quasiquote-form
     unquote-form
