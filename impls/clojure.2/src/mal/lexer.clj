@@ -157,13 +157,17 @@
    number])
 
 (def token
-  (pa/make-parser [state]
-    (let [parser (pa/let-bind [value (apply pa/choice token-types)
-                               _ whitespaces]
-                   (pa/return
-                     (let [[_ line column] state]
-                       (->Token value line column))))]
-      (pa/run parser state))))
+  (let [value (apply pa/choice token-types)
+        parser (pa/let-bind [v value
+                             _ whitespaces]
+                 (pa/return v))]
+    (pa/make-parser [[_ line column :as state]]
+        (pa/run
+          (pa/map
+            (fn [v]
+              (->Token v line column))
+            parser)
+          state))))
 
 (defn tokenize [stream]
   (let [parser (pa/let-bind [_ whitespaces
