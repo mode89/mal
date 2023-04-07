@@ -107,6 +107,13 @@
         (list (l/->Symbol "splice-unquote") f))
       (form))))
 
+(def deref-form
+  (pa/let-bind [_ (token \@)]
+    (pa/map
+      (fn [f]
+        (list (l/->Symbol "deref") f))
+      (form))))
+
 (defn form []
   (pa/label "expected a valid form"
     (pa/choice
@@ -117,6 +124,7 @@
       quasiquote-form
       unquote-form
       splice-unquote-form
+      deref-form
       atom)))
 
 (defn read-string [string]
