@@ -64,10 +64,42 @@
     (pa/let-bind [_ left-bracket]
       elements)))
 
+(def quote-form
+  (pa/let-bind [_ (token \')]
+    (pa/map
+      (fn [f]
+        (list (l/->Symbol "quote") f))
+      (form))))
+
+(def quasiquote-form
+  (pa/let-bind [_ (token \`)]
+    (pa/map
+      (fn [f]
+        (list (l/->Symbol "quasiquote") f))
+      (form))))
+
+(def unquote-form
+  (pa/let-bind [_ (token \~)]
+    (pa/map
+      (fn [f]
+        (list (l/->Symbol "unquote") f))
+      (form))))
+
+(def splice-unquote-form
+  (pa/let-bind [_ (token "~@")]
+    (pa/map
+      (fn [f]
+        (list (l/->Symbol "splice-unquote") f))
+      (form))))
+
 (defn form []
   (pa/choice
     list-form
     vector-form
+    quote-form
+    quasiquote-form
+    unquote-form
+    splice-unquote-form
     atom))
 
 (defn read-string [string]
