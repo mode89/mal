@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [atom read-string])
   (:require [mal.lexer :as l]
             [mal.parsing :as pa])
-  (:import [mal.lexer Symbol]
+  (:import [mal.lexer Keyword Symbol]
            [mal.parsing ParseError Value]))
 
 (def any-token
@@ -31,7 +31,8 @@
         (fn [v]
           (or (string? v)
               (number? v)
-              (instance? Symbol v)))
+              (instance? Symbol v)
+              (instance? Keyword v)))
         (pa/map
           (fn [t] (:value t))
           any-token)))))
@@ -107,15 +108,16 @@
       (form))))
 
 (defn form []
-  (pa/choice
-    list-form
-    vector-form
-    hash-map-form
-    quote-form
-    quasiquote-form
-    unquote-form
-    splice-unquote-form
-    atom))
+  (pa/label "expected a valid form"
+    (pa/choice
+      list-form
+      vector-form
+      hash-map-form
+      quote-form
+      quasiquote-form
+      unquote-form
+      splice-unquote-form
+      atom)))
 
 (defn read-string [string]
   (let [tokens (l/tokenize string)

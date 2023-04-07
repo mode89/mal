@@ -121,8 +121,16 @@
                     :remainder '() :line 1 :column 2}))
     (is (= (p "a1") {:value (l/->Symbol "a1")
                      :remainder '() :line 1 :column 3}))
-    (is (= (p "*s+o!m-e_s'y?m<b>o=l/n.a1m2e")
-           {:value (l/->Symbol "*s+o!m-e_s'y?m<b>o=l/n.a1m2e")
+    (is (= (p "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
+           {:value (l/->Symbol "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
+            :remainder '() :line 1 :column 30}))))
+
+(deftest keywords
+  (let [p (partial l/run l/keyword)]
+    (is (= (p ":a") {:value (l/->Keyword "a")
+                     :remainder '() :line 1 :column 3}))
+    (is (= (p ":some.namespace/keyword-name")
+           {:value (l/->Keyword "some.namespace/keyword-name")
             :remainder '() :line 1 :column 29}))))
 
 (deftest token
@@ -138,7 +146,10 @@
     (is (= (p "1234, ; number\n ,\t") {:value (l/->Token 1234 1 1)
                                        :remainder '() :line 2 :column 4}))
     (is (= (p "42x ") {:error "invalid number",
-                       :remainder '(\x \space) :line 1 :column 3}))))
+                       :remainder '(\x \space) :line 1 :column 3}))
+    (is (= (p ":another.name.space/some.kw,\n\t")
+           {:value (l/->Token (l/->Keyword "another.name.space/some.kw") 1 1)
+            :remainder '() :line 2 :column 2}))))
 
 (deftest tokenize
   (is (= (l/tokenize "") []))

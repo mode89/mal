@@ -1,11 +1,12 @@
 (ns mal.lexer
-  (:refer-clojure :exclude [atom comment newline symbol])
+  (:refer-clojure :exclude [atom comment keyword newline symbol])
   (:require [mal.parsing :as pa])
   (:import [mal.parsing Value]))
 
 (defrecord Token [value line column])
 (defrecord Comment [text])
 (defrecord Symbol [name])
+(defrecord Keyword [name])
 
 (defn letter? [ch]
   (java.lang.Character/isLetter ch))
@@ -61,6 +62,7 @@
 (def double-quote (character \"))
 (def backslash (character \\ ))
 (def semicolon (character \;))
+(def colon (character \:))
 (def tilde (character \~))
 (def at (character \@))
 
@@ -115,21 +117,28 @@
   (pa/label "digit"
     (pa/try (pa/satisfy digit? any-char))))
 
-(def symbol-init-char
+(def symbol-special-char
+  (one-of "*+!-_'?<>=/."))
+
+(def symbol-middle-char
   (pa/choice
     letter
-    (one-of "*+!-_'?<>=/.")))
-
-(def symbol-rest-char
-  (pa/choice
-    symbol-init-char
-    digit))
+    digit
+    symbol-special-char
+    colon))
 
 (def symbol
-  (pa/label "symbol"
-    (pa/let-bind [init-char symbol-init-char
-                  rest-chars (pa/many symbol-rest-char)]
-      (pa/return (->Symbol (apply str (cons init-char rest-chars)))))))
+  (let [init-char (pa/choice letter symbol-special-char)
+        rest-chars (pa/many symbol-middle-char)]
+    (pa/let-bind [ic init-char
+                  rcs rest-chars]
+      (pa/return (->Symbol (apply str (cons ic rcs)))))))
+
+(def keyword
+  (let [name (pa/many symbol-middle-char)]
+    (pa/let-bind [_ colon
+                  nm name]
+      (pa/return (->Keyword (apply str nm))))))
 
 (defn integer-from-string [digits]
   (try
@@ -140,7 +149,7 @@
 (def integer
   (pa/let-bind [digits (pa/many digit)
                 _ (pa/label "invalid number"
-                    (pa/not-followed-by symbol-rest-char))]
+                    (pa/not-followed-by symbol-middle-char))]
     (let [number (integer-from-string (apply str digits))]
       (if (some? number)
         (pa/return number)
@@ -153,6 +162,7 @@
 (def token-types
   [special-character
    symbol
+   keyword
    string-literal
    number])
 

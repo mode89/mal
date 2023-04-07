@@ -99,4 +99,6 @@
   (is (= (r/read-string "~(1 \"2\" a)")
          (list (l/->Symbol "unquote") (list 1 "2" (l/->Symbol "a")))))
   (is (= (r/read-string "~@(1 \"2\" a)")
-         (list (l/->Symbol "splice-unquote") (list 1 "2" (l/->Symbol "a"))))))
+         (list (l/->Symbol "splice-unquote") (list 1 "2" (l/->Symbol "a")))))
+  (is (= (r/read-string ",\n:some.namespace/some-keyword,; comment\n")
+         (l/->Keyword "some.namespace/some-keyword"))))
