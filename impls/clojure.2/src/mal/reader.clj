@@ -114,6 +114,12 @@
         (list (l/->Symbol "deref") f))
       (form))))
 
+(def with-meta-form
+  (pa/let-bind [_ (token \^)
+                m (form)
+                f (form)]
+    (pa/return (list (l/->Symbol "with-meta") f m))))
+
 (defn form []
   (pa/label "expected a valid form"
     (pa/choice
@@ -125,6 +131,7 @@
       unquote-form
       splice-unquote-form
       deref-form
+      with-meta-form
       atom)))
 
 (defn read-string [string]

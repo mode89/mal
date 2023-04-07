@@ -102,4 +102,6 @@
          (list (l/->Symbol "splice-unquote") (list 1 "2" (l/->Symbol "a")))))
   (is (= (r/read-string ",\n:some.namespace/some-keyword,; comment\n")
          (l/->Keyword "some.namespace/some-keyword")))
-  (is (= (r/read-string "@a") (list (l/->Symbol "deref") (l/->Symbol "a")))))
+  (is (= (r/read-string "@a") (list (l/->Symbol "deref") (l/->Symbol "a"))))
+  (is (= (r/read-string "^{\"a\" 1} [1 2 3]")
+         (list (l/->Symbol "with-meta") [1 2 3] {"a" 1}))))
