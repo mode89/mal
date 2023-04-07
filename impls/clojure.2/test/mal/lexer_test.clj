@@ -87,6 +87,11 @@
            {:value (str \1 \" \2 \\ \newline \3 \\ \" \4)
             :remainder '() :line 1 :column 17}))))
 
+(deftest special-character
+  (let [p (partial l/run l/special-character)]
+    (is (= (p [\~ \@]) {:value "~@" :remainder '() :line 1 :column 3}))
+    (is (= (p [\~ \1]) {:value \~ :remainder '(\1) :line 1 :column 2}))))
+
 (deftest letter
   (let [p (partial l/run l/letter)]
     (is (= (p "a") {:value \a :remainder '() :line 1 :column 2}))

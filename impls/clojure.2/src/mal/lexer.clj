@@ -101,7 +101,10 @@
 (def special-character
   (pa/label "special character"
     (pa/choice
-      (pa/map (pa/sequence [tilde at]) :to "~@")
+      (pa/try
+        (pa/let-bind [_ tilde
+                      _ at]
+          (pa/return "~@")))
       (one-of "[]{}()'`~^@"))))
 
 (def letter
