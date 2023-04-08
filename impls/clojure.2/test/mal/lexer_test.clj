@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [comment])
   (:require [clojure.string :refer [join]]
             [clojure.test :refer [deftest is]]
+            [mal.core :as core]
             [mal.lexer :as l]
             [mal.test.utils :refer [catch-ex-info]]))
 
@@ -117,20 +118,20 @@
 
 (deftest symbols
   (let [p (partial l/run l/symbol)]
-    (is (= (p "a") {:value (l/->Symbol "a")
+    (is (= (p "a") {:value (core/symbol "a")
                     :remainder '() :line 1 :column 2}))
-    (is (= (p "a1") {:value (l/->Symbol "a1")
+    (is (= (p "a1") {:value (core/symbol "a1")
                      :remainder '() :line 1 :column 3}))
     (is (= (p "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
-           {:value (l/->Symbol "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
+           {:value (core/symbol "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
             :remainder '() :line 1 :column 30}))))
 
 (deftest keywords
   (let [p (partial l/run l/keyword)]
-    (is (= (p ":a") {:value (l/->Keyword "a")
+    (is (= (p ":a") {:value (core/keyword "a")
                      :remainder '() :line 1 :column 3}))
     (is (= (p ":some.namespace/keyword-name")
-           {:value (l/->Keyword "some.namespace/keyword-name")
+           {:value (core/keyword "some.namespace/keyword-name")
             :remainder '() :line 1 :column 29}))))
 
 (deftest token
@@ -138,7 +139,7 @@
     (is (= (p "~@ ,\n") {:value (l/->Token "~@" 1 1)
                          :remainder '() :line 2 :column 1}))
     (is (= (p "some-symbol\n\n\t")
-           {:value (l/->Token (l/->Symbol "some-symbol") 1 1)
+           {:value (l/->Token (core/symbol "some-symbol") 1 1)
             :remainder '() :line 3 :column 2}))
     (is (= (p "\"some\\\"st\nring\"\t, \n, ")
            {:value (l/->Token "some\"st\nring" 1 1)
@@ -148,7 +149,9 @@
     (is (= (p "42x ") {:error "invalid number",
                        :remainder '(\x \space) :line 1 :column 3}))
     (is (= (p ":another.name.space/some.kw,\n\t")
-           {:value (l/->Token (l/->Keyword "another.name.space/some.kw") 1 1)
+           {:value (l/->Token (core/keyword
+                                "another.name.space/some.kw")
+                              1 1)
             :remainder '() :line 2 :column 2}))))
 
 (deftest tokenize
@@ -162,16 +165,16 @@
               "       e [f g]"
               "       \"h\" 42})"]))
          [(l/->Token \( 2 1)
-          (l/->Token (l/->Symbol "a") 2 2)
+          (l/->Token (core/symbol "a") 2 2)
           (l/->Token \' 2 4)
-          (l/->Token (l/->Symbol "b") 2 5)
+          (l/->Token (core/symbol "b") 2 5)
           (l/->Token \{ 2 7)
-          (l/->Token (l/->Symbol "c") 2 8)
-          (l/->Token (l/->Symbol "d") 2 10)
-          (l/->Token (l/->Symbol "e") 3 8)
+          (l/->Token (core/symbol "c") 2 8)
+          (l/->Token (core/symbol "d") 2 10)
+          (l/->Token (core/symbol "e") 3 8)
           (l/->Token \[ 3 10)
-          (l/->Token (l/->Symbol "f") 3 11)
-          (l/->Token (l/->Symbol "g") 3 13)
+          (l/->Token (core/symbol "f") 3 11)
+          (l/->Token (core/symbol "g") 3 13)
           (l/->Token \] 3 14)
           (l/->Token "h" 4 8)
           (l/->Token 42 4 12)

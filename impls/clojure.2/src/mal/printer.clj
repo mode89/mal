@@ -1,8 +1,7 @@
 (ns mal.printer
   (:refer-clojure :exclude [pr-str])
   (:require [clojure.string :refer [join]]
-            [mal.lexer])
-  (:import [mal.lexer Keyword Symbol]))
+            [mal.core :as core]))
 
 (defn pr-char [ch]
   (case ch
@@ -18,9 +17,9 @@
       (str object)
     (string? object)
       (apply str (concat [\"] (map pr-char object) [\"]))
-    (instance? Symbol object)
+    (core/symbol? object)
       (str (:name object))
-    (instance? Keyword object)
+    (core/keyword? object)
       (str \: (:name object))
     (list? object)
       (str \( (join " " (map pr-str object)) \) )

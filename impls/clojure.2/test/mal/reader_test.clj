@@ -1,6 +1,7 @@
 (ns mal.reader-test
   (:require [clojure.string :refer [join]]
             [clojure.test :refer [deftest is]]
+            [mal.core :as core]
             [mal.lexer :as l]
             [mal.parsing :as pa]
             [mal.reader :as r]
@@ -35,12 +36,12 @@
     (is (= (p [(l/->Token \( 1 1)
                (l/->Token 1 1 2)
                (l/->Token \( 1 4)
-               (l/->Token (l/->Symbol "a") 1 5)
+               (l/->Token (core/symbol "a") 1 5)
                (l/->Token "2" 1 7)
                (l/->Token \) 1 10)
                (l/->Token 3 1 12)
                (l/->Token \) 1 13)])
-           (pa/->Value (list 1 (list (l/->Symbol "a") "2") 3) [])))
+           (pa/->Value (list 1 (list (core/symbol "a") "2") 3) [])))
     (is (instance? ParseError
           (p [(l/->Token \( 1 1)
               (l/->Token 1 1 2)])))))
@@ -50,9 +51,9 @@
     (is (= (p [(l/->Token \[ 1 1)
                (l/->Token 1 1 2)
                (l/->Token "2" 1 4)
-               (l/->Token (l/->Symbol "x") 1 8)
+               (l/->Token (core/symbol "x") 1 8)
                (l/->Token \] 1 9)])
-           (pa/->Value [1 "2" (l/->Symbol "x")] [])))))
+           (pa/->Value [1 "2" (core/symbol "x")] [])))))
 
 (deftest read-strings
   (is (= (r/read-string "42") 42))
@@ -69,14 +70,14 @@
               "  [a b c]"
               "  ; get some of numbers"
               "  (+ a, b, c))"]))
-         (list (l/->Symbol "defn")
-               (l/->Symbol "foo")
+         (list (core/symbol "defn")
+               (core/symbol "foo")
                "A docstring"
-               [(l/->Symbol "a") (l/->Symbol "b") (l/->Symbol "c")]
-               (list (l/->Symbol "+")
-                     (l/->Symbol "a")
-                     (l/->Symbol "b")
-                     (l/->Symbol "c")))))
+               [(core/symbol "a") (core/symbol "b") (core/symbol "c")]
+               (list (core/symbol "+")
+                     (core/symbol "a")
+                     (core/symbol "b")
+                     (core/symbol "c")))))
   (is (= (r/read-string "{}") {}))
   (is (= (r/read-string "{1 2}") {1 2}))
   (is (= (catch-ex-info (r/read-string "{1 2"))
@@ -89,19 +90,21 @@
          ["Failed to parse" {:message "unbalanced list" :next-token {}}]))
   (is (= (catch-ex-info (r/read-string "[1 2"))
          ["Failed to parse" {:message "unbalanced vector" :next-token {}}]))
-  (is (= (r/read-string "'1") (list (l/->Symbol "quote") 1)))
+  (is (= (r/read-string "'1") (list (core/symbol "quote") 1)))
   (is (= (r/read-string "'(1 \"2\" a)")
-         (list (l/->Symbol "quote") (list 1 "2" (l/->Symbol "a")))))
-  (is (= (r/read-string "`1") (list (l/->Symbol "quasiquote") 1)))
+         (list (core/symbol "quote") (list 1 "2" (core/symbol "a")))))
+  (is (= (r/read-string "`1") (list (core/symbol "quasiquote") 1)))
   (is (= (r/read-string "`(1 \"2\" a)")
-         (list (l/->Symbol "quasiquote") (list 1 "2" (l/->Symbol "a")))))
-  (is (= (r/read-string "~1") (list (l/->Symbol "unquote") 1)))
+         (list (core/symbol "quasiquote") (list 1 "2" (core/symbol "a")))))
+  (is (= (r/read-string "~1") (list (core/symbol "unquote") 1)))
   (is (= (r/read-string "~(1 \"2\" a)")
-         (list (l/->Symbol "unquote") (list 1 "2" (l/->Symbol "a")))))
+         (list (core/symbol "unquote") (list 1 "2" (core/symbol "a")))))
   (is (= (r/read-string "~@(1 \"2\" a)")
-         (list (l/->Symbol "splice-unquote") (list 1 "2" (l/->Symbol "a")))))
+         (list (core/symbol "splice-unquote")
+               (list 1 "2" (core/symbol "a")))))
   (is (= (r/read-string ",\n:some.namespace/some-keyword,; comment\n")
-         (l/->Keyword "some.namespace/some-keyword")))
-  (is (= (r/read-string "@a") (list (l/->Symbol "deref") (l/->Symbol "a"))))
+         (core/keyword "some.namespace/some-keyword")))
+  (is (= (r/read-string "@a")
+         (list (core/symbol "deref") (core/symbol "a"))))
   (is (= (r/read-string "^{\"a\" 1} [1 2 3]")
-         (list (l/->Symbol "with-meta") [1 2 3] {"a" 1}))))
+         (list (core/symbol "with-meta") [1 2 3] {"a" 1}))))

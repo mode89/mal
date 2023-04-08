@@ -1,12 +1,11 @@
 (ns mal.lexer
   (:refer-clojure :exclude [atom comment keyword newline symbol])
-  (:require [mal.parsing :as pa])
+  (:require [mal.core :as core]
+            [mal.parsing :as pa])
   (:import [mal.parsing Value]))
 
 (defrecord Token [value line column])
 (defrecord Comment [text])
-(defrecord Symbol [name])
-(defrecord Keyword [name])
 
 (defn letter? [ch]
   (java.lang.Character/isLetter ch))
@@ -132,13 +131,13 @@
         rest-chars (pa/many symbol-middle-char)]
     (pa/let-bind [ic init-char
                   rcs rest-chars]
-      (pa/return (->Symbol (apply str (cons ic rcs)))))))
+      (pa/return (core/symbol (apply str (cons ic rcs)))))))
 
 (def keyword
   (let [name (pa/many symbol-middle-char)]
     (pa/let-bind [_ colon
                   nm name]
-      (pa/return (->Keyword (apply str nm))))))
+      (pa/return (core/keyword (apply str nm))))))
 
 (defn integer-from-string [digits]
   (try
