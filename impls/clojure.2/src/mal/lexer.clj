@@ -146,13 +146,24 @@
       nil)))
 
 (def integer
-  (pa/let-bind [digits (pa/many digit)
-                _ (pa/label "invalid number"
-                    (pa/not-followed-by symbol-middle-char))]
-    (let [number (integer-from-string (apply str digits))]
-      (if (some? number)
-        (pa/return number)
-        (pa/fail "invalid number")))))
+  (let [sign (pa/maybe (one-of "+-"))
+        beginning (pa/let-bind [s sign
+                                d1 digit]
+                    (pa/return [s d1]))
+        not-followed-by-symbol-char (pa/label "invalid number"
+                                      (pa/not-followed-by
+                                        symbol-middle-char))
+        digits (pa/many digit)]
+    (pa/let-bind [[s d1] (pa/try beginning)
+                  ds digits
+                  _ not-followed-by-symbol-char]
+      (let [number (integer-from-string (apply str (cons d1 ds)))]
+        (if (some? number)
+          (pa/return
+            (if (= s \-)
+              (- number)
+              number))
+          (pa/fail "invalid number"))))))
 
 (def number
   (pa/label "number"
@@ -160,10 +171,10 @@
 
 (def token-types
   [special-character
+   number
    symbol
    keyword
-   string-literal
-   number])
+   string-literal])
 
 (def token
   (let [value (apply pa/choice token-types)

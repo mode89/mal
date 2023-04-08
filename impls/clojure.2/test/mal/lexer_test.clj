@@ -114,7 +114,9 @@
     (is (= (p "2147483647") {:value 2147483647
                              :remainder '() :line 1 :column 11}))
     (is (= (p "2147483648") {:error "invalid number"
-                             :remainder '() :line 1 :column 11}))))
+                             :remainder '() :line 1 :column 11}))
+    (is (= (p "-123") {:value -123 :remainder '() :line 1 :column 5}))
+    (is (= (p "+456") {:value 456 :remainder '() :line 1 :column 5}))))
 
 (deftest symbols
   (let [p (partial l/run l/symbol)]
@@ -184,4 +186,10 @@
          ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}]))
   (is (= (catch-ex-info (l/tokenize "\"abc"))
          ["Failed to tokenize"
-          {:error "unbalanced string" :line 1 :column 5}])))
+          {:error "unbalanced string" :line 1 :column 5}]))
+  (is (= (l/tokenize ", -42\n") [(l/->Token -42 1 3)]))
+  (is (= (l/tokenize "\n+42,\t") [(l/->Token 42 2 1)]))
+  (is (= (catch-ex-info (l/tokenize " -1a "))
+         ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}]))
+  (is (= (l/tokenize "-a") [(l/->Token (core/symbol "-a") 1 1)]))
+  (is (= (l/tokenize "+x") [(l/->Token (core/symbol "+x") 1 1)])))
