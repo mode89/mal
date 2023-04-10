@@ -14,3 +14,16 @@
 
 (defn symbol? [x]
   (instance? Symbol x))
+
+(defn debug-macro [x]
+  (let [m (meta x)
+        tag (:tag m)
+        prefix (if (some? tag)
+                 (str tag)
+                 nil)]
+    `(let [x# ~x
+           prefix# ~prefix]
+       (if (some? prefix#)
+         (println prefix# x#)
+         (println x#))
+       x#)))
