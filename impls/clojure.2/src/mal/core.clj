@@ -15,6 +15,9 @@
 (defn symbol? [x]
   (instance? Symbol x))
 
+(defn hash-map? [x]
+  (instance? clojure.lang.PersistentArrayMap x))
+
 (defn debug-macro [x]
   (let [m (meta x)
         tag (:tag m)

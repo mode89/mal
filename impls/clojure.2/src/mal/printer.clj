@@ -25,7 +25,7 @@
       (str \( (join " " (map pr-str object)) \) )
     (vector? object)
       (str \[ (join " " (map pr-str object)) \] )
-    (map? object)
+    (core/hash-map? object)
       (str \{ (join " " (map pr-str (flatten (into [] object)))) \} )
     :else
       (throw (ex-info "Don't know how to print this" {:object object}))))
