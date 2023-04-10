@@ -29,7 +29,9 @@
     (pa/try
       (pa/satisfy
         (fn [v]
-          (or (string? v)
+          (or (nil? v)
+              (boolean? v)
+              (string? v)
               (number? v)
               (core/symbol? v)
               (core/keyword? v)))

@@ -20,4 +20,6 @@
          ":some.namespace/some-keyword"))
   (is (= (p/pr-str {(core/keyword "a") 1 (core/keyword "b") 2})
          "{:a 1 :b 2}"))
-  (is (= (p/pr-str nil) "nil")))
+  (is (= (p/pr-str nil) "nil"))
+  (is (= (p/pr-str true) "true"))
+  (is (= (p/pr-str false) "false")))

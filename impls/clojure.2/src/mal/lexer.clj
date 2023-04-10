@@ -8,10 +8,14 @@
 (defrecord Comment [text])
 
 (defn letter? [ch]
-  (java.lang.Character/isLetter ch))
+  (if (some? ch)
+    (java.lang.Character/isLetter ch)
+    false))
 
 (defn digit? [ch]
-  (java.lang.Character/isDigit ch))
+  (if (some? ch)
+    (java.lang.Character/isDigit ch)
+    false))
 
 (defn run [parser char-stream]
   (let [result (pa/run parser [char-stream 1 1])
@@ -116,65 +120,44 @@
   (pa/label "digit"
     (pa/try (pa/satisfy digit? any-char))))
 
-(def symbol-special-char
-  (one-of "*+!-_'?<>=/."))
-
-(def symbol-middle-char
+(def atom-char
   (pa/choice
     letter
     digit
-    symbol-special-char
-    colon))
+    (one-of ":*+!-_'?<>=/.")))
 
-(def symbol
-  (let [init-char (pa/choice letter symbol-special-char)
-        rest-chars (pa/many symbol-middle-char)]
-    (pa/let-bind [ic init-char
-                  rcs rest-chars]
-      (pa/return (core/symbol (apply str (cons ic rcs)))))))
-
-(def keyword
-  (let [name (pa/many symbol-middle-char)]
-    (pa/let-bind [_ colon
-                  nm name]
-      (pa/return (core/keyword (apply str nm))))))
-
-(defn integer-from-string [digits]
+(defn number-from-string [s]
   (try
-    (Integer/parseInt digits)
+    (Integer/parseInt s)
     (catch Exception _
       nil)))
 
-(def integer
-  (let [sign (pa/maybe (one-of "+-"))
-        beginning (pa/let-bind [s sign
-                                d1 digit]
-                    (pa/return [s d1]))
-        not-followed-by-symbol-char (pa/label "invalid number"
-                                      (pa/not-followed-by
-                                        symbol-middle-char))
-        digits (pa/many digit)]
-    (pa/let-bind [[s d1] (pa/try beginning)
-                  ds digits
-                  _ not-followed-by-symbol-char]
-      (let [number (integer-from-string (apply str (cons d1 ds)))]
-        (if (some? number)
-          (pa/return
-            (if (= s \-)
-              (- number)
-              number))
-          (pa/fail "invalid number"))))))
-
-(def number
-  (pa/label "number"
-    (pa/choice integer)))
+(def atom
+  (pa/let-bind [id-vector (pa/many atom-char)]
+    (let [id (apply str id-vector)
+          id0 (first id)]
+      (cond
+        (= "nil" id)
+          (pa/return nil)
+        (= "true" id)
+          (pa/return true)
+        (= "false" id)
+          (pa/return false)
+        (or (digit? id0)
+            (and (or (= \+ id0) (= \- id0))
+                 (digit? (second id))))
+          (if-some [value (number-from-string id)]
+            (pa/return value)
+            (pa/fail (str "invalid number: " id)))
+        (= \: id0)
+          (pa/return (core/keyword (apply str (rest id))))
+        :else
+          (pa/return (core/symbol id))))))
 
 (def token-types
   [special-character
-   number
-   symbol
-   keyword
-   string-literal])
+   string-literal
+   atom])
 
 (def token
   (let [value (apply pa/choice token-types)

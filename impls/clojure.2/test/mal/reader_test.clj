@@ -59,9 +59,9 @@
   (is (= (r/read-string "42") 42))
   (is (= (catch-ex-info (r/read-string "("))
          ["Failed to parse" {:message "unbalanced list" :next-token {}}]))
-  (is (= (catch-ex-info (r/read-string "42x"))
+  (is (= (catch-ex-info (r/read-string "123+"))
          ["Failed to tokenize"
-          {:error "invalid number" :line 1 :column 3}]))
+          {:error "invalid number: 123+" :line 1 :column 5}]))
   (is (= (r/read-string
            (join \newline
              [" ; some function "
@@ -107,4 +107,6 @@
   (is (= (r/read-string "@a")
          (list (core/symbol "deref") (core/symbol "a"))))
   (is (= (r/read-string "^{\"a\" 1} [1 2 3]")
-         (list (core/symbol "with-meta") [1 2 3] {"a" 1}))))
+         (list (core/symbol "with-meta") [1 2 3] {"a" 1})))
+  (is (= (r/read-string "[1 nil {:a true :b [false]}]")
+         [1 nil {(core/keyword "a") true (core/keyword "b") [false]}])))

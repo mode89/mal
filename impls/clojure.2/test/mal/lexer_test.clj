@@ -104,22 +104,22 @@
     (is (= (p "a") {:error "digit" :remainder "a" :line 1 :column 1}))))
 
 (deftest integer
-  (let [p (partial l/run l/integer)]
+  (let [p (partial l/run l/atom)]
     (is (= (p "1") {:value 1 :remainder '() :line 1 :column 2}))
     (is (= (p "12345") {:value 12345 :remainder '() :line 1 :column 6}))
-    (is (= (p "12345a") {:error "invalid number"
-                         :remainder '(\a) :line 1 :column 6}))
+    (is (= (p "12345a") {:error "invalid number: 12345a"
+                         :remainder '() :line 1 :column 7}))
     (is (= (p "12345)") {:value 12345
                          :remainder '( \) ) :line 1 :column 6}))
     (is (= (p "2147483647") {:value 2147483647
                              :remainder '() :line 1 :column 11}))
-    (is (= (p "2147483648") {:error "invalid number"
+    (is (= (p "2147483648") {:error "invalid number: 2147483648"
                              :remainder '() :line 1 :column 11}))
     (is (= (p "-123") {:value -123 :remainder '() :line 1 :column 5}))
     (is (= (p "+456") {:value 456 :remainder '() :line 1 :column 5}))))
 
 (deftest symbols
-  (let [p (partial l/run l/symbol)]
+  (let [p (partial l/run l/atom)]
     (is (= (p "a") {:value (core/symbol "a")
                     :remainder '() :line 1 :column 2}))
     (is (= (p "a1") {:value (core/symbol "a1")
@@ -129,7 +129,7 @@
             :remainder '() :line 1 :column 30}))))
 
 (deftest keywords
-  (let [p (partial l/run l/keyword)]
+  (let [p (partial l/run l/atom)]
     (is (= (p ":a") {:value (core/keyword "a")
                      :remainder '() :line 1 :column 3}))
     (is (= (p ":some.namespace/keyword-name")
@@ -148,13 +148,25 @@
             :remainder '() :line 3 :column 3}))
     (is (= (p "1234, ; number\n ,\t") {:value (l/->Token 1234 1 1)
                                        :remainder '() :line 2 :column 4}))
-    (is (= (p "42x ") {:error "invalid number",
-                       :remainder '(\x \space) :line 1 :column 3}))
+    (is (= (p "42x ") {:error "invalid number: 42x",
+                       :remainder '(\space) :line 1 :column 4}))
     (is (= (p ":another.name.space/some.kw,\n\t")
            {:value (l/->Token (core/keyword
                                 "another.name.space/some.kw")
                               1 1)
-            :remainder '() :line 2 :column 2}))))
+            :remainder '() :line 2 :column 2}))
+    (is (= (p "nil\n") {:value (l/->Token nil 1 1)
+                        :remainder '() :line 2 :column 1}))
+    (is (= (p "nilA ") {:value (l/->Token (core/symbol "nilA") 1 1)
+                       :remainder '() :line 1 :column 6}))
+    (is (= (p "true,") {:value (l/->Token true 1 1)
+                        :remainder '() :line 1 :column 6}))
+    (is (= (p "true?\n") {:value (l/->Token (core/symbol "true?") 1 1)
+                         :remainder '() :line 2 :column 1}))
+    (is (= (p "false\t") {:value (l/->Token false 1 1)
+                          :remainder '() :line 1 :column 7}))
+    (is (= (p "false+") {:value (l/->Token (core/symbol "false+") 1 1)
+                         :remainder '() :line 1 :column 7}))))
 
 (deftest tokenize
   (is (= (l/tokenize "") []))
@@ -182,14 +194,16 @@
           (l/->Token 42 4 12)
           (l/->Token \} 4 14)
           (l/->Token \) 4 15)]))
-  (is (= (catch-ex-info (l/tokenize " 42x "))
-         ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}]))
+  (is (= (catch-ex-info (l/tokenize " 9001- "))
+         ["Failed to tokenize"
+          {:error "invalid number: 9001-" :line 1 :column 7}]))
   (is (= (catch-ex-info (l/tokenize "\"abc"))
          ["Failed to tokenize"
           {:error "unbalanced string" :line 1 :column 5}]))
   (is (= (l/tokenize ", -42\n") [(l/->Token -42 1 3)]))
   (is (= (l/tokenize "\n+42,\t") [(l/->Token 42 2 1)]))
   (is (= (catch-ex-info (l/tokenize " -1a "))
-         ["Failed to tokenize" {:error "invalid number" :line 1 :column 4}]))
+         ["Failed to tokenize"
+          {:error "invalid number: -1a" :line 1 :column 5}]))
   (is (= (l/tokenize "-a") [(l/->Token (core/symbol "-a") 1 1)]))
   (is (= (l/tokenize "+x") [(l/->Token (core/symbol "+x") 1 1)])))
