@@ -19,4 +19,5 @@
   (is (= (p/pr-str (core/keyword "some.namespace/some-keyword"))
          ":some.namespace/some-keyword"))
   (is (= (p/pr-str {(core/keyword "a") 1 (core/keyword "b") 2})
-         "{:a 1 :b 2}")))
+         "{:a 1 :b 2}"))
+  (is (= (p/pr-str nil) "nil")))
