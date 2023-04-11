@@ -3,6 +3,8 @@
             [mal.core :as core]
             [mal.environ :as environ]))
 
+(def basic-env (environ/make nil {(core/symbol "+") +}))
+
 (deftest core-eval
   (is (= (core/eval 42 (environ/make nil {})) 42))
   (is (= (core/eval '() (environ/make nil {})) '()))
@@ -31,14 +33,13 @@
                       env)
            42))
     (is (= (deref env) {:outer nil :table {(core/symbol "a") 42}})))
-  (let [env (environ/make nil {(core/symbol "+") +})]
+  (let [env (environ/make basic-env {})]
     (is (= (core/eval (list (core/symbol "def!")
                             (core/symbol "a")
                             (list (core/symbol "+") 1 2))
                       env)
            3))
-    (is (= (deref env) {:outer nil :table {(core/symbol "a") 3
-                                           (core/symbol "+") +}}))))
+    (is (= (deref env) {:outer basic-env :table {(core/symbol "a") 3}}))))
 
 (deftest eval-let
   (is (= (core/eval (list (core/symbol "let*") '() 42)
@@ -51,7 +52,7 @@
                       env)
            42))
     (is (= (deref env) {:outer nil :table {}})))
-  (let [env (environ/make nil {(core/symbol "+") +})]
+  (let [env (environ/make basic-env {})]
     (is (= (core/eval (list (core/symbol "let*")
                             (list (core/symbol "a") 1
                                   (core/symbol "b") 2)
@@ -59,7 +60,21 @@
                                   (core/symbol "b")))
                       env)
            3))
-    (is (= (deref env) {:outer nil :table {(core/symbol "+") +}}))))
+    (is (= (deref env) {:outer basic-env :table {}})))
+  (let [env (environ/make basic-env {})]
+    (is (= (core/eval (list (core/symbol "let*")
+                            (list (core/symbol "a") 1
+                                  (core/symbol "b")
+                                    (list (core/symbol "+")
+                                          (core/symbol "a")
+                                          1)
+                                  (core/symbol "c")
+                                    (list (core/symbol "+")
+                                          (core/symbol "a")
+                                          (core/symbol "b")))
+                            (core/symbol "c"))
+                      env)
+           3))))
 
 (deftest eval-do
   (is (= (core/eval (list (core/symbol "do")) (environ/make nil {})) nil))
