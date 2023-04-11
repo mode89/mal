@@ -80,11 +80,13 @@
                          body (second args)]
                      (assert (even? (count bindings)))
                      (loop [bs bindings]
-                       (let [bname (first bs)
-                             bvalue (second bs)]
-                         (assert (symbol? bname))
-                         (environ/set! let-env bname (eval bvalue let-env))
-                         (when (> (count bs) 2)
+                       (when (>= (count bs) 2)
+                         (let [bname (first bs)
+                               bvalue (second bs)]
+                           (assert (symbol? bname))
+                           (environ/set! let-env
+                                         bname
+                                         (eval bvalue let-env))
                            (recur (drop 2 bs)))))
                      (eval body let-env))
             (call-form head args env))

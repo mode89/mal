@@ -41,6 +41,9 @@
                                            (core/symbol "+") +}}))))
 
 (deftest eval-let
+  (is (= (core/eval (list (core/symbol "let*") '() 42)
+                    (environ/make nil {}))
+         42))
   (let [env (environ/make nil {})]
     (is (= (core/eval (list (core/symbol "let*")
                             (list (core/symbol "a") 42)
