@@ -1,6 +1,7 @@
 (ns mal.core
-  (:refer-clojure :exclude [eval keyword keyword? symbol symbol?])
-  (:require [mal.environ :as environ]
+  (:refer-clojure :exclude [eval keyword keyword? pr-str symbol symbol?])
+  (:require [clojure.string :refer [join]]
+            [mal.environ :as environ]
             [mal.types])
   (:import [mal.types Keyword Symbol]))
 
@@ -20,6 +21,47 @@
 
 (defn hash-map? [x]
   (instance? clojure.lang.PersistentArrayMap x))
+
+(defn- -pr-char-readable [ch]
+  (case ch
+    \"       "\\\""
+    \newline "\\n"
+    \tab     "\\t"
+    \\       "\\\\"
+    ch))
+
+(defn pr-str [object print-readably]
+  (cond
+    (nil? object)
+      "nil"
+    (boolean? object)
+      (str object)
+    (number? object)
+      (str object)
+    (string? object)
+      (if print-readably
+        (apply str (concat [\"] (map -pr-char-readable object) [\"]))
+        object)
+    (symbol? object)
+      (str (:name object))
+    (keyword? object)
+      (str \: (:name object))
+    (list? object)
+      (str \( (join " " (map (fn [x]
+                               (pr-str x print-readably))
+                             object)) \) )
+    (vector? object)
+      (str \[ (join " " (map (fn [x]
+                               (pr-str x print-readably))
+                             object)) \] )
+    (hash-map? object)
+      (str \{ (join " " (map (fn [x]
+                               (pr-str x print-readably))
+                             (flatten (into [] object)))) \} )
+    (fn? object)
+      (str "#<function " (str object) ">")
+    :else
+      (throw (ex-info "Don't know how to print this" {:object object}))))
 
 (defn debug-macro [x]
   (let [m (meta x)

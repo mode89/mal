@@ -1,7 +1,6 @@
 (ns mal.s3
   (:require [mal.core :as core]
             [mal.environ :as environ]
-            [mal.printer :as printer]
             [mal.reader :as reader]))
 
 (def repl-env
@@ -19,7 +18,7 @@
   (core/eval form env))
 
 (defn PRINT [input]
-  (printer/pr-str input true))
+  (core/pr-str input true))
 
 (defn rep [input]
   (-> input

@@ -1,5 +1,5 @@
 (ns mal.s1
-  (:require [mal.printer :as printer]
+  (:require [mal.core :as core]
             [mal.reader :as reader]))
 
 (defn READ [input]
@@ -9,7 +9,7 @@
   input)
 
 (defn PRINT [input]
-  (printer/pr-str input true))
+  (core/pr-str input true))
 
 (defn rep [input]
   (-> input

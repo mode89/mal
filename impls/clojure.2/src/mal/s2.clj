@@ -1,6 +1,5 @@
 (ns mal.s2
   (:require [mal.core :as core]
-            [mal.printer :as printer]
             [mal.reader :as reader]))
 
 (declare EVAL)
@@ -48,7 +47,7 @@
     (eval-ast ast env)))
 
 (defn PRINT [input]
-  (printer/pr-str input true))
+  (core/pr-str input true))
 
 (defn rep [input]
   (-> input
