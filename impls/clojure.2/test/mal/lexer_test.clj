@@ -124,8 +124,8 @@
                     :remainder '() :line 1 :column 2}))
     (is (= (p "a1") {:value (core/symbol "a1")
                      :remainder '() :line 1 :column 3}))
-    (is (= (p "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
-           {:value (core/symbol "*s+o!m-e_s'y?m<b>o=l/n.a1:m2e")
+    (is (= (p "*s+o!m-e_s'y?m<b>o=l/n.a&:m2e")
+           {:value (core/symbol "*s+o!m-e_s'y?m<b>o=l/n.a&:m2e")
             :remainder '() :line 1 :column 30}))))
 
 (deftest keywords
@@ -166,7 +166,9 @@
     (is (= (p "false\t") {:value (l/->Token false 1 1)
                           :remainder '() :line 1 :column 7}))
     (is (= (p "false+") {:value (l/->Token (core/symbol "false+") 1 1)
-                         :remainder '() :line 1 :column 7}))))
+                         :remainder '() :line 1 :column 7}))
+    (is (= (p "&1b ,\t") {:value (l/->Token (core/symbol "&1b") 1 1)
+                          :remainder '() :line 1 :column 7}))))
 
 (deftest tokenize
   (is (= (l/tokenize "") []))

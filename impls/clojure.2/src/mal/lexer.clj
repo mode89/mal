@@ -124,7 +124,7 @@
   (pa/choice
     letter
     digit
-    (one-of ":*+!-_'?<>=/.")))
+    (one-of ":*+!-_'?<>=/.&")))
 
 (defn number-from-string [s]
   (try
