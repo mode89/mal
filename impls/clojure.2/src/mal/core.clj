@@ -89,6 +89,11 @@
                                          (eval bvalue let-env))
                            (recur (drop 2 bs)))))
                      (eval body let-env))
+            "do" (loop [forms args
+                        result nil]
+                   (if-some [form (first forms)]
+                     (recur (rest forms) (eval form env))
+                     result))
             (call-form head args env))
           (call-form head args env))))
     (eval-form form env)))

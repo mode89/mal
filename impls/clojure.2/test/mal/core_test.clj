@@ -60,3 +60,20 @@
                       env)
            3))
     (is (= (deref env) {:outer nil :table {(core/symbol "+") +}}))))
+
+(deftest eval-do
+  (is (= (core/eval (list (core/symbol "do")) (environ/make nil {})) nil))
+  (is (= (core/eval (list (core/symbol "do") 42) (environ/make nil {})) 42))
+  (is (= (core/eval
+           (list (core/symbol "do") 42 7 9001)
+           (environ/make nil {}))
+         9001))
+  (let [env (environ/make nil {})]
+    (is (= (core/eval
+             (list (core/symbol "do")
+                   (list (core/symbol "def!") (core/symbol "a") 42)
+                   (core/symbol "a"))
+             env)
+           42))
+    (is (= (deref env) {:outer nil
+                        :table {(core/symbol "a") 42}}))))
