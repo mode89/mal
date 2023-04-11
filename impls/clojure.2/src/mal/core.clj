@@ -102,6 +102,15 @@
                      (if (= nargs 3)
                        (eval (nth args 2) env)
                        nil)))
+            "fn*" (let [arg-defs (first args)
+                        body (second args)]
+                    (doseq [adef arg-defs]
+                      (assert (symbol? adef)))
+                    (fn [& arg-values]
+                      (assert (= (count arg-defs) (count arg-values)))
+                      (eval body
+                        (environ/make env
+                          (zipmap arg-defs arg-values)))))
             (call-form head args env))
           (call-form head args env))))
     (eval-form form env)))
