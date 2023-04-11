@@ -102,6 +102,34 @@
         args (map (fn [x] (eval x env)) args-ast)]
     (apply f args)))
 
+(defn- -fn-env-template [argument-definitions]
+  (loop [arg-defs argument-definitions
+         arg-index 0
+         template {}]
+    (if (empty? arg-defs)
+      template
+      (let [arg-def (first arg-defs)]
+        (assert (symbol? arg-def))
+        (if (= (:name arg-def) "&")
+          (let [rest-arg (second arg-defs)]
+            (assert (symbol? rest-arg))
+            (assert (= (count arg-defs) 2))
+            (assoc template rest-arg
+                   (fn [arg-values]
+                     (apply list (drop arg-index arg-values)))))
+          (recur (rest arg-defs)
+                 (inc arg-index)
+                 (assoc template arg-def
+                        (fn [arg-values]
+                          (nth arg-values arg-index)))))))))
+
+(defn- -fn-env [env-template argument-values]
+  (reduce-kv
+    (fn [env arg-name arg-value-extractor]
+      (assoc env arg-name (arg-value-extractor argument-values)))
+    {}
+    env-template))
+
 (defn eval [form env]
   (if (list? form)
     (if (empty? form)
@@ -145,14 +173,12 @@
                        (eval (nth args 2) env)
                        nil)))
             "fn*" (let [arg-defs (first args)
-                        body (second args)]
-                    (doseq [adef arg-defs]
-                      (assert (symbol? adef)))
+                        body (second args)
+                        env-template (-fn-env-template arg-defs)]
                     (fn [& arg-values]
-                      (assert (= (count arg-defs) (count arg-values)))
                       (eval body
                         (environ/make env
-                          (zipmap arg-defs arg-values)))))
+                          (-fn-env env-template arg-values)))))
             (call-form head args env))
           (call-form head args env))))
     (eval-form form env)))
