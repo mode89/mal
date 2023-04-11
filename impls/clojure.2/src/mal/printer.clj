@@ -11,7 +11,7 @@
     \\       "\\\\"
     ch))
 
-(defn pr-str [object]
+(defn pr-str [object print-readably]
   (cond
     (nil? object)
       "nil"
@@ -20,17 +20,25 @@
     (number? object)
       (str object)
     (string? object)
-      (apply str (concat [\"] (map pr-char object) [\"]))
+      (if print-readably
+        (apply str (concat [\"] (map pr-char object) [\"]))
+        object)
     (core/symbol? object)
       (str (:name object))
     (core/keyword? object)
       (str \: (:name object))
     (list? object)
-      (str \( (join " " (map pr-str object)) \) )
+      (str \( (join " " (map (fn [x]
+                               (pr-str x print-readably))
+                             object)) \) )
     (vector? object)
-      (str \[ (join " " (map pr-str object)) \] )
+      (str \[ (join " " (map (fn [x]
+                               (pr-str x print-readably))
+                             object)) \] )
     (core/hash-map? object)
-      (str \{ (join " " (map pr-str (flatten (into [] object)))) \} )
+      (str \{ (join " " (map (fn [x]
+                               (pr-str x print-readably))
+                             (flatten (into [] object)))) \} )
     (fn? object)
       (str "#<function " (str object) ">")
     :else
