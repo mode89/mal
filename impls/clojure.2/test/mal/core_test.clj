@@ -77,3 +77,31 @@
            42))
     (is (= (deref env) {:outer nil
                         :table {(core/symbol "a") 42}}))))
+
+(deftest eval-if
+  (is (= (core/eval (list (core/symbol "if") true 1 2)
+                    (environ/make nil {}))
+         1))
+  (is (= (core/eval (list (core/symbol "if") false 1 2)
+                    (environ/make nil {}))
+         2))
+  (is (= (core/eval (list (core/symbol "if") true 1)
+                    (environ/make nil {}))
+         1))
+  (is (= (core/eval (list (core/symbol "if") false 1)
+                    (environ/make nil {}))
+         nil))
+  (let [env (environ/make nil {})]
+    (is (= (core/eval (list (core/symbol "if") true
+                            (list (core/symbol "def!") (core/symbol "a") 1)
+                            (list (core/symbol "def!") (core/symbol "b") 2))
+                      env)
+           1))
+    (is (= (deref env) {:outer nil :table {(core/symbol "a") 1}})))
+  (let [env (environ/make nil {})]
+    (is (= (core/eval (list (core/symbol "if") false
+                            (list (core/symbol "def!") (core/symbol "a") 1)
+                            (list (core/symbol "def!") (core/symbol "b") 2))
+                      env)
+           2))
+    (is (= (deref env) {:outer nil :table {(core/symbol "b") 2}}))))

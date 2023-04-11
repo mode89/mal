@@ -94,6 +94,14 @@
                    (if-some [form (first forms)]
                      (recur (rest forms) (eval form env))
                      result))
+            "if" (let [nargs (count args)]
+                   (assert (>= nargs 2))
+                   (assert (<= nargs 3))
+                   (if (eval (first args) env)
+                     (eval (second args) env)
+                     (if (= nargs 3)
+                       (eval (nth args 2) env)
+                       nil)))
             (call-form head args env))
           (call-form head args env))))
     (eval-form form env)))
