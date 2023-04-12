@@ -1,5 +1,6 @@
 (ns mal.types)
 
-(defrecord Symbol [name])
-(defrecord Keyword [name])
+(defrecord Atom [value])
 (defrecord Function [params body make-env])
+(defrecord Keyword [name])
+(defrecord Symbol [name])

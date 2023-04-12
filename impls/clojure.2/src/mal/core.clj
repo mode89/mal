@@ -1,12 +1,13 @@
 (ns mal.core
-  (:refer-clojure :exclude [eval keyword keyword? fn? pr-str prn println
-                            read-string str symbol symbol?])
+  (:refer-clojure :exclude [atom deref eval keyword keyword? fn? pr-str prn
+                            println read-string reset! slurp str swap!
+                            symbol symbol?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.environ :as environ]
             [mal.reader :as reader]
             [mal.types])
-  (:import [mal.types Function Keyword Symbol]))
+  (:import [mal.types Atom Function Keyword Symbol]))
 
 (declare eval)
 
@@ -28,6 +29,12 @@
 (defn fn? [x]
   (or (instance? Function x)
       (clj/fn? x)))
+
+(defn atom [x]
+  (new Atom (clj/atom x)))
+
+(defn atom? [x]
+  (instance? Atom x))
 
 (defn- -pr-char-readable [ch]
   (case ch
@@ -76,6 +83,8 @@
                \} )
     (fn? object)
       (clj/str "#<function " (clj/str object) ">")
+    (atom? object)
+      (clj/str "(atom " (-> object :value clj/deref) ")")
     :else
       (throw (ex-info "Don't know how to print this" {:object object}))))
 
@@ -237,6 +246,24 @@
 
 (def read-string reader/read-string)
 
+(defn slurp [filename]
+  (clj/slurp filename))
+
+(defn deref [a]
+  (assert (atom? a))
+  (clj/deref (:value a)))
+
+(defn reset! [a v]
+  (assert (atom? a))
+  (clj/reset! (:value a) v))
+
+(defn swap! [a f & args]
+  (assert (atom? a))
+  (clj/swap! (:value a)
+    (fn [x]
+      (eval (clj/apply list f x args)
+            (environ/make nil {})))))
+
 (def core-ns
   {(symbol "list") list
    (symbol "list?") list?
@@ -256,4 +283,10 @@
    (symbol "prn") prn
    (symbol "str") str
    (symbol "println") println
-   (symbol "read-string") read-string})
+   (symbol "read-string") read-string
+   (symbol "slurp") slurp
+   (symbol "atom") atom
+   (symbol "atom?") atom?
+   (symbol "deref") deref
+   (symbol "reset!") reset!
+   (symbol "swap!") swap!})

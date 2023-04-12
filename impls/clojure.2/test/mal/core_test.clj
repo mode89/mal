@@ -208,3 +208,18 @@
   (is (= (core/read-string "(foo [1 \"2\"] {abc :def})")
          (list (core/symbol "foo") [1 "2"]
                {(core/symbol "abc") (core/keyword "def")}))))
+
+(deftest core-atom
+  (is (core/atom? (core/atom 42)))
+  (is (= (core/deref (core/atom 42)) 42))
+  (is (= (core/deref (core/atom [1 2 3])) [1 2 3]))
+  (let [a (core/atom 42)]
+    (core/reset! a 43)
+    (is (= (core/deref a) 43))
+    (core/swap! a + 1 2 3)
+    (is (= (core/deref a) 49)))
+  (let [a (core/atom 42)
+        foo (core/eval (core/read-string "(fn* [a b c] (+ a b c))")
+                       basic-env)]
+    (core/swap! a foo 1 2)
+    (is (= (core/deref a) 45))))
