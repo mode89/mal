@@ -218,3 +218,23 @@
              (pr-object x false))
            args)))
   (print \newline))
+
+(def core-ns
+  {(symbol "list") list
+   (symbol "list?") list?
+   (symbol "empty?") empty?
+   (symbol "count") count
+   (symbol "=") =
+   (symbol "<") <
+   (symbol "<=") <=
+   (symbol ">") >
+   (symbol ">=") >=
+   (symbol "+") +
+   (symbol "-") -
+   (symbol "*") *
+   (symbol "/") /
+   (symbol "not") not
+   (symbol "pr-str") pr-str
+   (symbol "prn") prn
+   (symbol "str") str
+   (symbol "println") println})
