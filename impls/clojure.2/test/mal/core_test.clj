@@ -203,3 +203,8 @@
               (list (core/symbol "-") (core/symbol "n") 1)))))
       env)
     (is (= (core/eval (list (core/symbol "foo") 10000) env) 0))))
+
+(deftest core-read-string
+  (is (= (core/read-string "(foo [1 \"2\"] {abc :def})")
+         (list (core/symbol "foo") [1 "2"]
+               {(core/symbol "abc") (core/keyword "def")}))))

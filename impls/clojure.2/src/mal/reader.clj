@@ -1,9 +1,10 @@
 (ns mal.reader
   (:refer-clojure :exclude [atom read-string])
-  (:require [mal.core :as core]
-            [mal.lexer :as l]
-            [mal.parsing :as pa])
-  (:import [mal.parsing ParseError Value]))
+  (:require [mal.lexer :as l]
+            [mal.parsing :as pa]
+            [mal.types])
+  (:import [mal.parsing ParseError Value]
+           [mal.types Keyword Symbol]))
 
 (def any-token
   (pa/make-parser [tokens]
@@ -33,8 +34,8 @@
               (boolean? v)
               (string? v)
               (number? v)
-              (core/symbol? v)
-              (core/keyword? v)))
+              (instance? Symbol v)
+              (instance? Keyword v)))
         (pa/map
           (fn [t] (:value t))
           any-token)))))
@@ -85,42 +86,42 @@
   (pa/let-bind [_ (token \')]
     (pa/map
       (fn [f]
-        (list (core/symbol "quote") f))
+        (list (new Symbol "quote") f))
       (form))))
 
 (def quasiquote-form
   (pa/let-bind [_ (token \`)]
     (pa/map
       (fn [f]
-        (list (core/symbol "quasiquote") f))
+        (list (new Symbol "quasiquote") f))
       (form))))
 
 (def unquote-form
   (pa/let-bind [_ (token \~)]
     (pa/map
       (fn [f]
-        (list (core/symbol "unquote") f))
+        (list (new Symbol "unquote") f))
       (form))))
 
 (def splice-unquote-form
   (pa/let-bind [_ (token "~@")]
     (pa/map
       (fn [f]
-        (list (core/symbol "splice-unquote") f))
+        (list (new Symbol "splice-unquote") f))
       (form))))
 
 (def deref-form
   (pa/let-bind [_ (token \@)]
     (pa/map
       (fn [f]
-        (list (core/symbol "deref") f))
+        (list (new Symbol "deref") f))
       (form))))
 
 (def with-meta-form
   (pa/let-bind [_ (token \^)
                 m (form)
                 f (form)]
-    (pa/return (list (core/symbol "with-meta") f m))))
+    (pa/return (list (new Symbol "with-meta") f m))))
 
 (defn form []
   (pa/label "expected a valid form"

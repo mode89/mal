@@ -1,9 +1,10 @@
 (ns mal.core
   (:refer-clojure :exclude [eval keyword keyword? fn? pr-str prn println
-                            str symbol symbol?])
+                            read-string str symbol symbol?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.environ :as environ]
+            [mal.reader :as reader]
             [mal.types])
   (:import [mal.types Function Keyword Symbol]))
 
@@ -234,6 +235,8 @@
            args)))
   (print \newline))
 
+(def read-string reader/read-string)
+
 (def core-ns
   {(symbol "list") list
    (symbol "list?") list?
@@ -252,4 +255,5 @@
    (symbol "pr-str") pr-str
    (symbol "prn") prn
    (symbol "str") str
-   (symbol "println") println})
+   (symbol "println") println
+   (symbol "read-string") read-string})
