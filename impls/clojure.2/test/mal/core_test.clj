@@ -1,9 +1,14 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
-            [mal.environ :as environ]))
+            [mal.environ :as environ])
+  (:import [mal.types Function]))
 
-(def basic-env (environ/make nil {(core/symbol "+") +}))
+(def basic-env
+  (environ/make nil
+    {(core/symbol "+") +
+     (core/symbol "-") -
+     (core/symbol "=") =}))
 
 (deftest core-eval
   (is (= (core/eval 42 (environ/make nil {})) 42))
@@ -122,8 +127,9 @@
     (is (= (deref env) {:outer nil :table {(core/symbol "b") 2}}))))
 
 (deftest eval-fn
-  (is (fn? (core/eval (list (core/symbol "fn*") '() 42)
-                      (environ/make nil {}))))
+  (is (instance? Function
+        (core/eval (list (core/symbol "fn*") '() 42)
+                   (environ/make nil {}))))
   (is (= (core/eval (list (list (core/symbol "fn*") '() 42))
                     (environ/make nil {}))
          42))
@@ -175,3 +181,25 @@
   (is (= (core/str 1) "1"))
   (is (= (core/str 1 2 3) "123"))
   (is (= (core/str "a\"b") "a\"b")))
+
+(deftest eval-tail-call-optimization
+  (let [env (environ/make basic-env {})]
+    (core/eval
+      (list (core/symbol "def!") (core/symbol "foo")
+        (list (core/symbol "fn*") (list (core/symbol "n"))
+          (list (core/symbol "if")
+            (list (core/symbol "=") (core/symbol "n") 0)
+            0
+            (list (core/symbol "bar")
+              (list (core/symbol "-") (core/symbol "n") 1)))))
+      env)
+    (core/eval
+      (list (core/symbol "def!") (core/symbol "bar")
+        (list (core/symbol "fn*") (list (core/symbol "n"))
+          (list (core/symbol "if")
+            (list (core/symbol "=") (core/symbol "n") 0)
+            0
+            (list (core/symbol "foo")
+              (list (core/symbol "-") (core/symbol "n") 1)))))
+      env)
+    (is (= (core/eval (list (core/symbol "foo") 10000) env) 0))))
