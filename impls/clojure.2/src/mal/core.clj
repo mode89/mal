@@ -1,5 +1,8 @@
 (ns mal.core
-  (:refer-clojure :exclude [eval keyword keyword? pr-str symbol symbol?])
+  (:refer-clojure
+    :exclude [eval keyword keyword? pr-str prn println symbol symbol?]
+    :rename {str clj-str
+             println clj-println})
   (:require [clojure.string :refer [join]]
             [mal.environ :as environ]
             [mal.types])
@@ -30,36 +33,45 @@
     \\       "\\\\"
     ch))
 
-(defn pr-str [object print-readably]
+(defn pr-object [object print-readably]
   (cond
     (nil? object)
       "nil"
     (boolean? object)
-      (str object)
+      (clj-str object)
     (number? object)
-      (str object)
+      (clj-str object)
     (string? object)
       (if print-readably
-        (apply str (concat [\"] (map -pr-char-readable object) [\"]))
+        (apply clj-str (concat [\"] (map -pr-char-readable object) [\"]))
         object)
     (symbol? object)
-      (str (:name object))
+      (clj-str (:name object))
     (keyword? object)
-      (str \: (:name object))
+      (clj-str \: (:name object))
     (list? object)
-      (str \( (join " " (map (fn [x]
-                               (pr-str x print-readably))
-                             object)) \) )
+      (clj-str \(
+               (join " "
+                 (map (fn [x]
+                        (pr-object x print-readably))
+                      object))
+               \) )
     (vector? object)
-      (str \[ (join " " (map (fn [x]
-                               (pr-str x print-readably))
-                             object)) \] )
+      (clj-str \[
+               (join " "
+                 (map (fn [x]
+                        (pr-object x print-readably))
+                      object))
+               \] )
     (hash-map? object)
-      (str \{ (join " " (map (fn [x]
-                               (pr-str x print-readably))
-                             (flatten (into [] object)))) \} )
+      (clj-str \{
+               (join " "
+                 (map (fn [x]
+                        (pr-object x print-readably))
+                      (flatten (into [] object))))
+               \} )
     (fn? object)
-      (str "#<function " (str object) ">")
+      (clj-str "#<function " (clj-str object) ">")
     :else
       (throw (ex-info "Don't know how to print this" {:object object}))))
 
@@ -67,13 +79,13 @@
   (let [m (meta x)
         tag (:tag m)
         prefix (if (some? tag)
-                 (str tag)
+                 (clj-str tag)
                  nil)]
     `(let [x# ~x
            prefix# ~prefix]
        (if (some? prefix#)
-         (println prefix# x#)
-         (println x#))
+         (clj-println prefix# x#)
+         (clj-println x#))
        x#)))
 
 (defn eval-form [ast env]
@@ -182,3 +194,27 @@
             (call-form head args env))
           (call-form head args env))))
     (eval-form form env)))
+
+(defn pr-str [& args]
+  (join " "
+    (map (fn [x]
+           (pr-object x true))
+         args)))
+
+(defn str [& args]
+  (join ""
+    (map (fn [x]
+           (pr-object x false))
+         args)))
+
+(defn prn [& args]
+  (print (apply pr-str args))
+  (print \newline))
+
+(defn println [& args]
+  (print
+    (join " "
+      (map (fn [x]
+             (pr-object x false))
+           args)))
+  (print \newline))

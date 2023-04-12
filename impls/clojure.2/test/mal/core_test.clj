@@ -163,3 +163,15 @@
                           1 2 3 4 5)
                     (environ/make nil {}))
          [1 2 3 4 5])))
+
+(deftest core-pr-str
+  (is (= (core/pr-str) ""))
+  (is (= (core/pr-str 1) "1"))
+  (is (= (core/pr-str 1 2 3) "1 2 3"))
+  (is (= (core/pr-str "a\"b") "\"a\\\"b\"")))
+
+(deftest core-str
+  (is (= (core/str) ""))
+  (is (= (core/str 1) "1"))
+  (is (= (core/str 1 2 3) "123"))
+  (is (= (core/str "a\"b") "a\"b")))

@@ -9,7 +9,7 @@
   input)
 
 (defn PRINT [input]
-  (core/pr-str input true))
+  (core/pr-object input true))
 
 (defn rep [input]
   (-> input
