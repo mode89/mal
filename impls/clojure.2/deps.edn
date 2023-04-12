@@ -1,10 +1,10 @@
 {:aliases
-  {:step0_repl {:exec-fn mal.s0/main}
-   :step1_read_print {:exec-fn mal.s1/main}
-   :step2_eval {:exec-fn mal.s2/main}
-   :step3_env {:exec-fn mal.s3/main}
-   :step4_if_fn_do {:exec-fn mal.s4/main}
-   :step5_tco {:exec-fn mal.s5/main}
+  {:step0_repl {:main-opts ["--main" "mal.s0"]}
+   :step1_read_print {:main-opts ["--main" "mal.s1"]}
+   :step2_eval {:main-opts ["--main" "mal.s2"]}
+   :step3_env {:main-opts ["--main" "mal.s3"]}
+   :step4_if_fn_do {:main-opts ["--main" "mal.s4"]}
+   :step5_tco {:main-opts ["--main" "mal.s5"]}
    :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.7"}}
            :main-opts ["-m" "nrepl.cmdline" "--middleware"
                        "[cider.nrepl/cider-middleware]"]}

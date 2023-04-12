@@ -26,7 +26,7 @@
       (EVAL repl-env)
       PRINT))
 
-(defn main [& _]
+(defn -main [& _]
   (loop []
     (print "user> ")
     (flush)
