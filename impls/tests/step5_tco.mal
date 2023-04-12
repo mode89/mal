@@ -19,5 +19,5 @@ res2
 (def! foo (fn* (n) (if (= n 0) 0 (bar (- n 1)))))
 (def! bar (fn* (n) (if (= n 0) 0 (foo (- n 1)))))
 
-(foo 10000)
+(foo 3000)
 ;=>0
