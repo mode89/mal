@@ -9,7 +9,9 @@
     {(core/symbol "+") +
      (core/symbol "-") -
      (core/symbol "=") =
-     (core/symbol "list") list}))
+     (core/symbol "list") list
+     (core/symbol "cons") core/cons
+     (core/symbol "concat") core/concat}))
 
 (deftest core-eval
   (is (= (core/eval 42 (environ/make nil {})) 42))
@@ -253,3 +255,115 @@
   (is (core/list? (list)))
   (is (core/list? (list 1 2 3)))
   (is (not (core/list? []))))
+
+(deftest eval-quote
+  (is (= (core/eval
+           (list (core/symbol "quote") 42)
+           (environ/make nil {}))
+         42))
+  (is (= (core/eval
+           (list (core/symbol "quote") (list 1 2 3))
+           (environ/make nil {}))
+         (list 1 2 3)))
+  (is (= (core/eval
+           (list (core/symbol "quote") (core/symbol "foo"))
+           (environ/make nil {}))
+         (core/symbol "foo")))
+  (is (= (core/eval
+           (list (core/symbol "quote") (list (core/symbol "quote") 42))
+           (environ/make nil {}))
+         (list (core/symbol "quote") 42)))
+  (is (= (core/eval
+           (list (core/symbol "quote") [1 2 3])
+           (environ/make nil {}))
+         [1 2 3]))
+  (is (= (core/eval
+           (list (core/symbol "quote")
+                 {(core/keyword "a") 1
+                  (core/keyword "b") 2})
+           (environ/make nil {}))
+         {(core/keyword "a") 1
+          (core/keyword "b") 2})))
+
+(deftest core-quasiquote
+  (is (= (core/quasiquote 42) 42))
+  (is (= (core/quasiquote (core/symbol "foo"))
+         (list (core/symbol "quote") (core/symbol "foo"))))
+  (is (= (core/quasiquote (list)) (list)))
+  (is (= (core/quasiquote (list (core/symbol "unquote") 42)) 42))
+  (is (= (core/quasiquote (list 42)) (list (core/symbol "list") 42)))
+  (is (= (core/quasiquote (list 1 2))
+         (list (core/symbol "cons") 1 (list (core/symbol "list") 2))))
+  (is (= (core/quasiquote
+           (list (list (core/symbol "splice-unquote")
+                       (core/symbol "foo"))))
+         (core/symbol "foo")))
+  (is (= (core/quasiquote
+           (list 42
+                 (list (core/symbol "splice-unquote")
+                       (core/symbol "foo"))))
+         (list (core/symbol "cons") 42 (core/symbol "foo"))))
+  (is (= (core/quasiquote
+           (list (list (core/symbol "splice-unquote")
+                       (core/symbol "foo"))
+                 42))
+         (list (core/symbol "concat") (core/symbol "foo")
+               (list (core/symbol "list") 42)))))
+
+(deftest eval-quasiquote
+  (is (= (core/eval
+           (list (core/symbol "quasiquote") 42)
+           (environ/make nil {}))
+         42))
+  (is (= (core/eval
+           (list (core/symbol "quasiquote") (core/symbol "x"))
+           (environ/make nil {}))
+         (core/symbol "x")))
+  (is (= (core/eval
+           (list (core/symbol "quasiquote") (list))
+           (environ/make nil {}))
+         (list)))
+  (is (= (core/eval
+           (list (core/symbol "quasiquote") (list 1 2 3))
+           basic-env)
+         (list 1 2 3)))
+  (is (= (core/eval
+           (list (core/symbol "quasiquote")
+             (list (core/symbol "unquote") 42))
+           basic-env)
+         42))
+  (is (= (core/eval
+           (list (core/symbol "quasiquote")
+              {"a" (core/symbol "b")})
+           (environ/make nil {}))
+         {"a" (core/symbol "b")}))
+  (let [env (environ/make basic-env {(core/symbol "x") 42
+                                     (core/symbol "l") (list 1 2 3)})]
+    (is (= (core/eval
+             (list (core/symbol "quasiquote")
+               (list (core/symbol "unquote") (core/symbol "x")))
+             env)
+           42))
+    (is (= (core/eval
+             (list (core/symbol "quasiquote")
+               (list (list (core/symbol "unquote") (core/symbol "x"))))
+             env)
+           (list 42)))
+    (is (= (core/eval
+             (list (core/symbol "quasiquote")
+               (list (core/symbol "unquote") (core/symbol "l")))
+             env)
+           (list 1 2 3)))
+    (is (= (core/eval
+             (list (core/symbol "quasiquote")
+               (list (list (core/symbol "splice-unquote")
+                           (core/symbol "l"))))
+             env)
+           (list 1 2 3)))
+    (is (= (core/eval
+             (list (core/symbol "quasiquote")
+               (list 1
+                     (list (core/symbol "splice-unquote") (core/symbol "l"))
+                     (list (core/symbol "unquote") (core/symbol "x"))))
+             env)
+           (list 1 1 2 3 42)))))
