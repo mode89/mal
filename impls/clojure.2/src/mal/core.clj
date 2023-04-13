@@ -302,7 +302,11 @@
             (environ/make nil {})))))
 
 (defn cons [x xs]
-  (clj/conj xs x))
+  (cond
+    (list? xs)
+      (clj/conj xs x)
+    (vector? xs)
+      (apply list (clj/cons x xs))))
 
 (defn concat [& args]
   (if (empty? args)

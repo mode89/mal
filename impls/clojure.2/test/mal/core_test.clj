@@ -238,7 +238,13 @@
 
 (deftest core-cons
   (is (core/list? (core/cons 1 (list 2 3))))
-  (is (= (core/cons 1 (list 2 3)) (list 1 2 3))))
+  (is (= (core/cons 1 (list 2 3)) (list 1 2 3)))
+  (is (core/list? (core/cons 1 [])))
+  (is (= (core/cons 1 []) (list 1)))
+  (is (core/list? (core/cons [1] [2 3])))
+  (is (= (core/cons [1] [2 3]) (list [1] 2 3)))
+  (is (core/list? (core/cons 1 [2 3])))
+  (is (= (core/cons 1 [2 3]) (list 1 2 3))))
 
 (deftest core-concat
   (is (core/list? (core/concat)))
