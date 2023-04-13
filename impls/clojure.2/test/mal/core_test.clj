@@ -8,7 +8,8 @@
   (environ/make nil
     {(core/symbol "+") +
      (core/symbol "-") -
-     (core/symbol "=") =}))
+     (core/symbol "=") =
+     (core/symbol "list") list}))
 
 (deftest core-eval
   (is (= (core/eval 42 (environ/make nil {})) 42))
@@ -44,7 +45,16 @@
                             (list (core/symbol "+") 1 2))
                       env)
            3))
-    (is (= (deref env) {:outer basic-env :table {(core/symbol "a") 3}}))))
+    (is (= (deref env) {:outer basic-env :table {(core/symbol "a") 3}})))
+  (let [env (environ/make basic-env {})]
+    (is (= (core/eval
+             (list (core/symbol "def!")
+               (core/symbol "a")
+               (list (core/symbol "list") 1 2))
+             env)
+           (list 1 2)))
+    (is (= (deref env) {:outer basic-env
+                        :table {(core/symbol "a") (list 1 2)}}))))
 
 (deftest eval-let
   (is (= (core/eval (list (core/symbol "let*") '() 42)

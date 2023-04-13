@@ -163,7 +163,7 @@
               (assert (= (count args) 2))
               (assert (symbol? name))
               (let [value (eval value-ast env)]
-                (environ/set! env name (eval value env))
+                (environ/set! env name value)
                 value))
           (symbol "let*")
             (let [let-env (environ/make env {})
