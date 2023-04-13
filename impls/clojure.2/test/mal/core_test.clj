@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.environ :as environ]
-            [mal.test.utils :refer [is-list?]])
+            [mal.test.utils :refer [is-list? is-vector?]])
   (:import [mal.types Function]))
 
 (def basic-env
@@ -12,7 +12,8 @@
      (core/symbol "=") =
      (core/symbol "list") list
      (core/symbol "cons") core/cons
-     (core/symbol "concat") core/concat}))
+     (core/symbol "concat") core/concat
+     (core/symbol "vec") core/vec}))
 
 (deftest core-eval
   (is (= (core/eval 42 (environ/make nil {})) 42))
@@ -340,6 +341,24 @@
               {"a" (core/symbol "b")})
            (environ/make nil {}))
          {"a" (core/symbol "b")}))
+  (is-vector?
+    (core/eval
+      (list (core/symbol "quasiquote")
+        [(core/symbol "a")
+         []
+         (core/symbol "b")
+         [(core/symbol "c")]
+         (core/symbol "d")
+         [(core/symbol "e") (core/symbol "f")]
+         (core/symbol "g")])
+      basic-env)
+    [(core/symbol "a")
+     []
+     (core/symbol "b")
+     [(core/symbol "c")]
+     (core/symbol "d")
+     [(core/symbol "e") (core/symbol "f")]
+     (core/symbol "g")])
   (let [env (environ/make basic-env {(core/symbol "x") 42
                                      (core/symbol "l") (list 1 2 3)})]
     (is (= (core/eval
@@ -369,4 +388,24 @@
                      (list (core/symbol "splice-unquote") (core/symbol "l"))
                      (list (core/symbol "unquote") (core/symbol "x"))))
              env)
-           (list 1 1 2 3 42)))))
+           (list 1 1 2 3 42)))
+    (is-vector?
+      (core/eval
+        (list (core/symbol "quasiquote")
+          (vector
+            (list
+              1
+              (list (core/symbol "splice-unquote") (core/symbol "l"))
+              (list (core/symbol "unquote") (core/symbol "x")))))
+        env)
+      (vector (list 1 1 2 3 42)))
+    (is-list?
+      (core/eval
+        (list (core/symbol "quasiquote")
+          (list
+            (vector
+              1
+              (list (core/symbol "splice-unquote") (core/symbol "l"))
+              (list (core/symbol "unquote") (core/symbol "x")))))
+        env)
+      (list (vector 1 1 2 3 42)))))

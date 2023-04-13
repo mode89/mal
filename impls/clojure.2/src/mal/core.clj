@@ -1,7 +1,7 @@
 (ns mal.core
   (:refer-clojure :exclude [atom concat cons deref eval fn? keyword keyword?
                             list?  pr-str prn println read-string reset!
-                            slurp str swap!  symbol symbol?])
+                            slurp str swap!  symbol symbol? vec vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.environ :as environ]
@@ -38,6 +38,9 @@
 
 (defn list? [x]
   (clj/list? x))
+
+(defn vector? [x]
+  (instance? clojure.lang.PersistentVector x))
 
 (defn- -pr-char-readable [ch]
   (case ch
@@ -116,7 +119,7 @@
             (eval x env))
           ast))
     (vector? ast)
-      (vec (map (fn [x] (eval x env)) ast))
+      (clj/vec (map (fn [x] (eval x env)) ast))
     (hash-map? ast)
       (into {}
         (map
@@ -176,10 +179,14 @@
                     (quasiquote (rest ast)))
               (list (symbol "list")
                     (quasiquote element))))))
-    (if (or (symbol? ast)
-            (hash-map? ast))
-      (list (symbol "quote") ast)
-      ast)))
+    (cond
+      (or (symbol? ast) (hash-map? ast))
+        (list (symbol "quote") ast)
+      (vector? ast)
+        (list (symbol "vec")
+          (quasiquote (clj/apply list ast)))
+      :else
+        ast)))
 
 (defn eval [form env]
   (if (list? form)
@@ -327,6 +334,13 @@
             (clj/apply list init-list))
         (rest lists)))))
 
+(defn vec [l]
+  (cond
+    (list? l)
+      (clj/vec l)
+    (vector? l)
+      l))
+
 (def core-ns
   {(symbol "list") list
    (symbol "list?") list?
@@ -354,4 +368,5 @@
    (symbol "reset!") reset!
    (symbol "swap!") swap!
    (symbol "cons") cons
-   (symbol "concat") concat})
+   (symbol "concat") concat
+   (symbol "vec") vec})
