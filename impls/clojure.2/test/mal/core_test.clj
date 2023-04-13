@@ -315,97 +315,57 @@
                (list (core/symbol "list") 42)))))
 
 (deftest eval-quasiquote
-  (is (= (core/eval
-           (list (core/symbol "quasiquote") 42)
-           (environ/make nil {}))
-         42))
-  (is (= (core/eval
-           (list (core/symbol "quasiquote") (core/symbol "x"))
-           (environ/make nil {}))
-         (core/symbol "x")))
-  (is (= (core/eval
-           (list (core/symbol "quasiquote") (list))
-           (environ/make nil {}))
-         (list)))
-  (is (= (core/eval
-           (list (core/symbol "quasiquote") (list 1 2 3))
-           basic-env)
-         (list 1 2 3)))
-  (is (= (core/eval
-           (list (core/symbol "quasiquote")
-             (list (core/symbol "unquote") 42))
-           basic-env)
-         42))
-  (is (= (core/eval
-           (list (core/symbol "quasiquote")
-              {"a" (core/symbol "b")})
-           (environ/make nil {}))
-         {"a" (core/symbol "b")}))
-  (is-vector?
-    (core/eval
-      (list (core/symbol "quasiquote")
-        [(core/symbol "a")
-         []
-         (core/symbol "b")
-         [(core/symbol "c")]
-         (core/symbol "d")
-         [(core/symbol "e") (core/symbol "f")]
-         (core/symbol "g")])
-      basic-env)
-    [(core/symbol "a")
-     []
-     (core/symbol "b")
-     [(core/symbol "c")]
-     (core/symbol "d")
-     [(core/symbol "e") (core/symbol "f")]
-     (core/symbol "g")])
   (let [env (environ/make basic-env {(core/symbol "x") 42
-                                     (core/symbol "l") (list 1 2 3)})]
-    (is (= (core/eval
-             (list (core/symbol "quasiquote")
-               (list (core/symbol "unquote") (core/symbol "x")))
-             env)
-           42))
-    (is (= (core/eval
-             (list (core/symbol "quasiquote")
-               (list (list (core/symbol "unquote") (core/symbol "x"))))
-             env)
+                                     (core/symbol "l") (list 1 2 3)})
+        eval-qq (fn [form]
+                  (core/eval
+                    (list (core/symbol "quasiquote") form)
+                    env))]
+    (is (= (eval-qq 42) 42))
+    (is (= (eval-qq (core/symbol "x")) (core/symbol "x")))
+    (is (= (eval-qq (list)) (list)))
+    (is (= (eval-qq (list 1 2 3)) (list 1 2 3)))
+    (is (= (eval-qq (list (core/symbol "unquote") 42)) 42))
+    (is (= (eval-qq {"a" (core/symbol "b")}) {"a" (core/symbol "b")}))
+    (is-vector?
+      (eval-qq [(core/symbol "a")
+               []
+               (core/symbol "b")
+               [(core/symbol "c")]
+               (core/symbol "d")
+               [(core/symbol "e") (core/symbol "f")]
+               (core/symbol "g")])
+      [(core/symbol "a")
+       []
+       (core/symbol "b")
+       [(core/symbol "c")]
+       (core/symbol "d")
+       [(core/symbol "e") (core/symbol "f")]
+       (core/symbol "g")])
+    (is (= (eval-qq (list (core/symbol "unquote") (core/symbol "x"))) 42))
+    (is (= (eval-qq (list (list (core/symbol "unquote") (core/symbol "x"))))
            (list 42)))
-    (is (= (core/eval
-             (list (core/symbol "quasiquote")
-               (list (core/symbol "unquote") (core/symbol "l")))
-             env)
+    (is (= (eval-qq (list (core/symbol "unquote") (core/symbol "l")))
            (list 1 2 3)))
-    (is (= (core/eval
-             (list (core/symbol "quasiquote")
-               (list (list (core/symbol "splice-unquote")
-                           (core/symbol "l"))))
-             env)
+    (is (= (eval-qq (list (list (core/symbol "splice-unquote")
+                                (core/symbol "l"))))
            (list 1 2 3)))
-    (is (= (core/eval
-             (list (core/symbol "quasiquote")
-               (list 1
-                     (list (core/symbol "splice-unquote") (core/symbol "l"))
-                     (list (core/symbol "unquote") (core/symbol "x"))))
-             env)
+    (is (= (eval-qq
+             (list 1
+                   (list (core/symbol "splice-unquote") (core/symbol "l"))
+                   (list (core/symbol "unquote") (core/symbol "x"))))
            (list 1 1 2 3 42)))
     (is-vector?
-      (core/eval
-        (list (core/symbol "quasiquote")
-          (vector
-            (list
-              1
-              (list (core/symbol "splice-unquote") (core/symbol "l"))
-              (list (core/symbol "unquote") (core/symbol "x")))))
-        env)
+      (eval-qq
+        (vector
+          (list 1
+                (list (core/symbol "splice-unquote") (core/symbol "l"))
+                (list (core/symbol "unquote") (core/symbol "x")))))
       (vector (list 1 1 2 3 42)))
     (is-list?
-      (core/eval
-        (list (core/symbol "quasiquote")
-          (list
-            (vector
-              1
-              (list (core/symbol "splice-unquote") (core/symbol "l"))
-              (list (core/symbol "unquote") (core/symbol "x")))))
-        env)
+      (eval-qq
+        (list
+          (vector 1
+                  (list (core/symbol "splice-unquote") (core/symbol "l"))
+                  (list (core/symbol "unquote") (core/symbol "x")))))
       (list (vector 1 1 2 3 42)))))
