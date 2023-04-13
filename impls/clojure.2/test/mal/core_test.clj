@@ -295,24 +295,25 @@
          (list (core/symbol "quote") (core/symbol "foo"))))
   (is (= (core/quasiquote (list)) (list)))
   (is (= (core/quasiquote (list (core/symbol "unquote") 42)) 42))
-  (is (= (core/quasiquote (list 42)) (list (core/symbol "list") 42)))
+  (is (= (core/quasiquote (list 42)) (list (core/symbol "cons") 42 '())))
   (is (= (core/quasiquote (list 1 2))
-         (list (core/symbol "cons") 1 (list (core/symbol "list") 2))))
+         (list (core/symbol "cons") 1 (list (core/symbol "cons") 2 '()))))
   (is (= (core/quasiquote
            (list (list (core/symbol "splice-unquote")
                        (core/symbol "foo"))))
-         (core/symbol "foo")))
+         (list (core/symbol "concat") (core/symbol "foo") '())))
   (is (= (core/quasiquote
            (list 42
                  (list (core/symbol "splice-unquote")
                        (core/symbol "foo"))))
-         (list (core/symbol "cons") 42 (core/symbol "foo"))))
+         (list (core/symbol "cons") 42
+           (list (core/symbol "concat") (core/symbol "foo") '()))))
   (is (= (core/quasiquote
            (list (list (core/symbol "splice-unquote")
                        (core/symbol "foo"))
                  42))
          (list (core/symbol "concat") (core/symbol "foo")
-               (list (core/symbol "list") 42)))))
+               (list (core/symbol "cons") 42 '())))))
 
 (deftest eval-quasiquote
   (let [env (environ/make basic-env {(core/symbol "x") 42

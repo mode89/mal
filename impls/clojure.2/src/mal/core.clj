@@ -169,17 +169,12 @@
         (let [element (first ast)]
           (if (and (list? element)
                    (= (first element) (symbol "splice-unquote")))
-            (if (> (count ast) 1)
-              (list (symbol "concat")
-                    (second element)
-                    (quasiquote (rest ast)))
-              (second element))
-            (if (> (count ast) 1)
-              (list (symbol "cons")
-                    (quasiquote element)
-                    (quasiquote (rest ast)))
-              (list (symbol "list")
-                    (quasiquote element))))))
+            (list (symbol "concat")
+                  (second element)
+                  (quasiquote (rest ast)))
+            (list (symbol "cons")
+                  (quasiquote element)
+                  (quasiquote (rest ast))))))
     (cond
       (or (symbol? ast) (hash-map? ast))
         (list (symbol "quote") ast)
@@ -252,6 +247,9 @@
           (symbol "quasiquote")
             (do (assert (= (count args) 1))
                 (recur (quasiquote (first args)) env))
+          (symbol "quasiquoteexpand")
+            (do (assert (= (count args) 1))
+                (quasiquote (first args)))
           (let [f (eval head env)
                 args (map (fn [x] (eval x env)) args)]
             (cond
