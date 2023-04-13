@@ -1,7 +1,7 @@
 (ns mal.core
-  (:refer-clojure :exclude [atom deref eval keyword keyword? fn? pr-str prn
-                            println read-string reset! slurp str swap!
-                            symbol symbol?])
+  (:refer-clojure :exclude [atom concat cons deref eval fn? keyword keyword?
+                            list?  pr-str prn println read-string reset!
+                            slurp str swap!  symbol symbol?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.environ :as environ]
@@ -36,6 +36,9 @@
 (defn atom? [x]
   (instance? Atom x))
 
+(defn list? [x]
+  (clj/list? x))
+
 (defn- -pr-char-readable [ch]
   (case ch
     \"       "\\\""
@@ -54,7 +57,8 @@
       (clj/str object)
     (string? object)
       (if print-readably
-        (apply clj/str (concat [\"] (map -pr-char-readable object) [\"]))
+        (apply clj/str
+          (clj/concat [\"] (map -pr-char-readable object) [\"]))
         object)
     (symbol? object)
       (clj/str (:name object))
@@ -264,6 +268,23 @@
       (eval (clj/apply list f x args)
             (environ/make nil {})))))
 
+(defn cons [x xs]
+  (clj/conj xs x))
+
+(defn concat [& args]
+  (if (empty? args)
+    (list)
+    (let [lists (reverse args)]
+      (reduce
+        (fn [acc l]
+          (loop [l (reverse l)
+                 result acc]
+            (if (empty? l)
+              result
+              (recur (rest l) (conj result (first l))))))
+        (first lists)
+        (rest lists)))))
+
 (def core-ns
   {(symbol "list") list
    (symbol "list?") list?
@@ -289,4 +310,6 @@
    (symbol "atom?") atom?
    (symbol "deref") deref
    (symbol "reset!") reset!
-   (symbol "swap!") swap!})
+   (symbol "swap!") swap!
+   (symbol "cons") cons
+   (symbol "concat") concat})

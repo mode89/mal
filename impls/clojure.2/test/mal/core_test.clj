@@ -233,3 +233,23 @@
                        basic-env)]
     (core/swap! a foo 1 2)
     (is (= (core/deref a) 45))))
+
+(deftest core-cons
+  (is (core/list? (core/cons 1 (list 2 3))))
+  (is (= (core/cons 1 (list 2 3)) (list 1 2 3))))
+
+(deftest core-concat
+  (is (core/list? (core/concat)))
+  (is (= (core/concat) (list)))
+  (is (core/list? (core/concat (list 1 2) (list 3 4))))
+  (is (= (core/concat (list 1 2) (list 3 4)) (list 1 2 3 4)))
+  (is (core/list? (core/concat (list 1 2) (list 3 4) (list 5 6))))
+  (is (= (core/concat (list 1 2) (list 3 4) (list 5 6)) (list 1 2 3 4 5 6)))
+  (is (core/list? (core/concat (list 1 2 3) (list 4 5 6) (list 7 8 9))))
+  (is (= (core/concat (list 1 2 3) (list 4 5 6) (list 7 8 9))
+         (list 1 2 3 4 5 6 7 8 9))))
+
+(deftest core-list?
+  (is (core/list? (list)))
+  (is (core/list? (list 1 2 3)))
+  (is (not (core/list? []))))
