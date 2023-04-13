@@ -311,15 +311,20 @@
 (defn concat [& args]
   (if (empty? args)
     (list)
-    (let [lists (reverse args)]
+    (let [lists (reverse args)
+          init-list (first lists)]
       (reduce
         (fn [acc l]
           (loop [l (reverse l)
                  result acc]
             (if (empty? l)
               result
-              (recur (rest l) (conj result (first l))))))
-        (first lists)
+              (recur (rest l) (cons (first l) result)))))
+        (cond
+          (list? init-list)
+            init-list
+          (vector? init-list)
+            (clj/apply list init-list))
         (rest lists)))))
 
 (def core-ns
