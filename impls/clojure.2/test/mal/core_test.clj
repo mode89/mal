@@ -368,4 +368,8 @@
           (vector 1
                   (list (core/symbol "splice-unquote") (core/symbol "l"))
                   (list (core/symbol "unquote") (core/symbol "x")))))
-      (list (vector 1 1 2 3 42)))))
+      (list (vector 1 1 2 3 42)))
+    (is (= (eval-qq (list 0 (core/symbol "unquote")))
+           (list 0 (core/symbol "unquote"))))
+    (is (= (eval-qq (list 0 (core/symbol "splice-unquote")))
+           (list 0 (core/symbol "splice-unquote"))))))

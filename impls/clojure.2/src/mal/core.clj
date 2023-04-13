@@ -162,7 +162,8 @@
     (cond
       (empty? ast)
         ast
-      (= (first ast) (symbol "unquote"))
+      (and (= (first ast) (symbol "unquote"))
+           (= (count ast) 2))
         (second ast)
       :else
         (let [element (first ast)]
