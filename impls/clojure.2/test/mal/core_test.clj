@@ -1,7 +1,8 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
-            [mal.environ :as environ])
+            [mal.environ :as environ]
+            [mal.test.utils :refer [is-list?]])
   (:import [mal.types Function]))
 
 (def basic-env
@@ -237,31 +238,21 @@
     (is (= (core/deref a) 45))))
 
 (deftest core-cons
-  (is (core/list? (core/cons 1 (list 2 3))))
-  (is (= (core/cons 1 (list 2 3)) (list 1 2 3)))
-  (is (core/list? (core/cons 1 [])))
-  (is (= (core/cons 1 []) (list 1)))
-  (is (core/list? (core/cons [1] [2 3])))
-  (is (= (core/cons [1] [2 3]) (list [1] 2 3)))
-  (is (core/list? (core/cons 1 [2 3])))
-  (is (= (core/cons 1 [2 3]) (list 1 2 3))))
+  (is-list? (core/cons 1 (list 2 3)) (list 1 2 3))
+  (is-list? (core/cons 1 []) (list 1))
+  (is-list? (core/cons [1] [2 3]) (list [1] 2 3))
+  (is-list? (core/cons 1 [2 3]) (list 1 2 3)))
 
 (deftest core-concat
-  (is (core/list? (core/concat)))
-  (is (= (core/concat) (list)))
-  (is (core/list? (core/concat (list 1 2) (list 3 4))))
-  (is (= (core/concat (list 1 2) (list 3 4)) (list 1 2 3 4)))
-  (is (core/list? (core/concat (list 1 2) (list 3 4) (list 5 6))))
-  (is (= (core/concat (list 1 2) (list 3 4) (list 5 6)) (list 1 2 3 4 5 6)))
-  (is (core/list? (core/concat (list 1 2 3) (list 4 5 6) (list 7 8 9))))
-  (is (= (core/concat (list 1 2 3) (list 4 5 6) (list 7 8 9))
-         (list 1 2 3 4 5 6 7 8 9)))
-  (is (core/list? (core/concat [1 2] (list 3 4) [5 6])))
-  (is (= (core/concat [1 2] (list 3 4) [5 6]) (list 1 2 3 4 5 6)))
-  (is (core/list? (core/concat (list 1 2) [3 4] (list 5 6))))
-  (is (= (core/concat (list 1 2) [3 4] (list 5 6)) (list 1 2 3 4 5 6)))
-  (is (core/list? (core/concat [1 2])))
-  (is (= (core/concat [1 2]) (list 1 2))))
+  (is-list? (core/concat) (list))
+  (is-list? (core/concat (list 1 2) (list 3 4)) (list 1 2 3 4))
+  (is-list? (core/concat (list 1 2) (list 3 4) (list 5 6))
+            (list 1 2 3 4 5 6))
+  (is-list? (core/concat (list 1 2 3) (list 4 5 6) (list 7 8 9))
+            (list 1 2 3 4 5 6 7 8 9))
+  (is-list? (core/concat [1 2] (list 3 4) [5 6]) (list 1 2 3 4 5 6))
+  (is-list? (core/concat (list 1 2) [3 4] (list 5 6)) (list 1 2 3 4 5 6))
+  (is-list? (core/concat [1 2]) (list 1 2)))
 
 (deftest core-list?
   (is (core/list? (list)))

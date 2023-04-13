@@ -5,3 +5,7 @@
      ~@body
      (catch clojure.lang.ExceptionInfo e#
        [(ex-message e#) (ex-data e#)])))
+
+(defmacro is-list? [expr value]
+  `(do (clojure.test/is (mal.core/list? ~expr))
+       (clojure.test/is (= ~value ~expr))))
