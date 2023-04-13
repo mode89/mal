@@ -313,7 +313,9 @@
     (list? xs)
       (clj/conj xs x)
     (vector? xs)
-      (apply list (clj/cons x xs))))
+      (apply list (clj/cons x xs))
+    :else
+      (throw (ex-info "Can't cons to this" {:object xs}))))
 
 (defn concat [& args]
   (if (empty? args)
@@ -339,7 +341,9 @@
     (list? l)
       (clj/vec l)
     (vector? l)
-      l))
+      l
+    :else
+      (throw (ex-info "Can't convert to vector" {:object l}))))
 
 (def core-ns
   {(symbol "list") list
