@@ -6,6 +6,7 @@
    :step4_if_fn_do {:main-opts ["--main" "mal.s4"]}
    :step5_tco {:main-opts ["--main" "mal.s5"]}
    :step6_file {:main-opts ["--main" "mal.s6"]}
+   :step7_quote {:main-opts ["--main" "mal.s7"]}
    :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.7"}}
            :main-opts ["-m" "nrepl.cmdline" "--middleware"
                        "[cider.nrepl/cider-middleware]"]}
