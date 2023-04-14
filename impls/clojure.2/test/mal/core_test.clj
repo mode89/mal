@@ -17,6 +17,9 @@
 (defn def$ [name value]
   (list (sym$ "def!") (sym$ name) value))
 
+(defn let$ [bindings body]
+  (list (sym$ "let*") bindings body))
+
 (defn if$ [pred then else]
   (list (sym$ "if") pred then else))
 
@@ -454,8 +457,17 @@
     (is (= (-> env deref :table (get (sym$ "a"))) 1)))
   (let [env (environ/make basic-env {})]
     (core/eval
-      (defmacro$ "just"
-        (fn$ (list (sym$ "x"))
-          (qq$ (unq$ (sym$ "x")))))
+      (defmacro$ "just" (fn$ (list (sym$ "x"))
+                          (qq$ (unq$ (sym$ "x")))))
       env)
-    (is (= (core/eval (list (sym$ "just") 42) env) 42))))
+    (is (= (core/eval (list (sym$ "just") 42) env) 42)))
+  (let [env (environ/make basic-env {})]
+    (core/eval
+      (defmacro$ "identity" (fn$ (list (sym$ "x"))
+                              (sym$ "x")))
+      env)
+    (is (= (core/eval
+             (let$ (list (sym$ "a") 123)
+               (list (sym$ "identity") (sym$ "a")))
+             env)
+           123))))

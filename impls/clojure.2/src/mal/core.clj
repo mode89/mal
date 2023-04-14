@@ -224,7 +224,7 @@
       form0
       (let [form (macroexpand form0 env)]
         (if (not (list? form))
-          form
+          (eval-form form env)
           (let [head (first form)
                 args (rest form)]
             (condp = head
