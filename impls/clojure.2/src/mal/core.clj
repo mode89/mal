@@ -1,8 +1,8 @@
 (ns mal.core
-  (:refer-clojure :exclude [atom concat cons deref eval fn? keyword keyword?
-                            list? macroexpand pr-str prn println read-string
-                            reset!  slurp str swap!  symbol symbol? vec
-                            vector?])
+  (:refer-clojure :exclude [atom concat cons deref eval first fn? keyword
+                            keyword? list? macroexpand nth pr-str prn
+                            println read-string reset! rest slurp str swap!
+                            symbol symbol? vec vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.environ :as environ]
@@ -11,6 +11,9 @@
   (:import [mal.types Atom Function Keyword Symbol]))
 
 (declare eval)
+(declare first)
+(declare nth)
+(declare rest)
 
 (defn keyword [name]
   (Keyword. name))
@@ -379,6 +382,33 @@
     (vector? l) l
     :else (throw (ex-info "Can't convert to vector" {:object l}))))
 
+(defn nth [coll i]
+  (cond
+    (list? coll) (clj/nth coll i)
+    (vector? coll) (clj/nth coll i)
+    (nil? coll) nil
+    (seq? coll) (clj/nth coll i)
+    :else (throw (ex-info "`nth` not supported on this type"
+                          {:object coll :type (type coll)}))))
+
+(defn first [coll]
+  (cond
+    (list? coll) (clj/first coll)
+    (vector? coll) (clj/first coll)
+    (nil? coll) nil
+    (seq? coll) (clj/first coll)
+    :else (throw (ex-info "`first` not supported on this type"
+                          {:object coll :type (type coll)}))))
+
+(defn rest [coll]
+  (cond
+    (list? coll) (clj/rest coll)
+    (vector? coll) (clj/apply list (clj/rest coll))
+    (nil? coll) (list)
+    (seq? coll) (clj/rest coll)
+    :else (throw (ex-info "`rest` not supported on this type"
+                          {:object coll :type (type coll)}))))
+
 (def core-ns
   {(symbol "list") clj/list
    (symbol "list?") list?
@@ -409,4 +439,7 @@
    (symbol "concat") concat
    (symbol "vec") vec
    (symbol "fn?") fn?
-   (symbol "macro?") macro?})
+   (symbol "macro?") macro?
+   (symbol "nth") nth
+   (symbol "first") first
+   (symbol "rest") rest})

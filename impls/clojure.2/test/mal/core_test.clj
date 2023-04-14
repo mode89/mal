@@ -471,3 +471,35 @@
                (list (sym$ "identity") (sym$ "a")))
              env)
            123))))
+
+(deftest core-nth
+  (is (= (core/nth nil 0) nil))
+  (is (= (core/nth nil 1) nil))
+  (is (thrown? Exception (core/nth (list) 0)))
+  (is (thrown? Exception (core/nth (list) 1)))
+  (is (= (core/nth (list 42) 0) 42))
+  (is (thrown? Exception (core/nth (list 42) 1)))
+  (is (thrown? Exception (core/nth [] 0)))
+  (is (thrown? Exception (core/nth [] 1)))
+  (is (= (core/nth [42] 0) 42))
+  (is (thrown? Exception (core/nth [42] 2)))
+  (is (thrown? Exception (core/nth 42 0))))
+
+(deftest core-first
+  (is (= (core/first nil) nil))
+  (is (= (core/first (list)) nil))
+  (is (= (core/first (list 42)) 42))
+  (is (= (core/first (list 10 11 12)) 10))
+  (is (= (core/first []) nil))
+  (is (= (core/first [42]) 42))
+  (is (= (core/first [10 11 12]) 10))
+  (is (thrown? Exception (core/first 42))))
+
+(deftest core-rest
+  (is-list? (core/rest nil) (list))
+  (is-list? (core/rest (list)) (list))
+  (is-list? (core/rest (list 1 2 3)) (list 2 3))
+  (is-list? (core/rest []) (list))
+  (is-list? (core/rest [10]) (list))
+  (is-list? (core/rest [10 11 12]) (list 11 12))
+  (is (thrown? Exception (core/rest 42))))
