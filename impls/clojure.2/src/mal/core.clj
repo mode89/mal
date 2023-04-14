@@ -423,7 +423,6 @@
    (symbol "-") -
    (symbol "*") *
    (symbol "/") /
-   (symbol "not") clj/not
    (symbol "pr-str") pr-str
    (symbol "prn") prn
    (symbol "str") str

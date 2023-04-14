@@ -23,6 +23,10 @@
       (EVAL repl-env)
       PRINT))
 
+(rep "(def! not
+        (fn* (a)
+          (if a false true)))")
+
 (defn -main [& _]
   (loop []
     (print "user> ")
