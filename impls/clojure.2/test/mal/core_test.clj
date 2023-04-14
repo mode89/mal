@@ -53,6 +53,15 @@
 (defn concat$ [& xs]
   (apply list (concat [(sym$ "concat")] xs)))
 
+(defn try$ [expr ex catch-expr]
+  (assert (string? ex))
+  (list (sym$ "try*") expr
+    (list (sym$ "catch*") (sym$ ex)
+      catch-expr)))
+
+(defn throw$ [obj]
+  (list (sym$ "throw*") obj))
+
 (def basic-env
   (core/env-make nil
     {(core/symbol "+") +
@@ -463,3 +472,27 @@
   (is-list? (core/rest [10]) (list))
   (is-list? (core/rest [10 11 12]) (list 11 12))
   (is (thrown? Exception (core/rest 42))))
+
+(deftest exceptions
+  (try
+    (core/throw 42)
+    (catch Throwable ex
+      (is (core/object-exception? ex))
+      (is (= (core/object-exception-unwrap ex) 42))))
+  (is (= (core/eval (try$ 123 "e" 456) (core/env-make nil {})) 123))
+  (is (= (core/eval (try$ (sym$ "abc") "exc"
+                      (list (sym$ "str") "exc is: " (sym$ "exc")))
+                    (core/env-make nil {(sym$ "str") core/str}))
+         "exc is: 'abc' not found"))
+  (is (= (core/eval (try$
+                      (do$ (try$ "t1" "e" "c1")
+                           (throw$ "e2"))
+                      "e" "c2")
+                    (core/env-make nil {}))
+         "c2"))
+
+  (is (= (core/eval (try$
+                      (try$ (throw$ "e1") "e" (throw$ "e2"))
+                      "e" "c2")
+                    (core/env-make nil {}))
+         "c2")))

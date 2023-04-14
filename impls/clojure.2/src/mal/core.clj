@@ -14,6 +14,7 @@
 (declare nth)
 (declare rest)
 (declare str)
+(declare throw)
 
 (defn keyword [name]
   (Keyword. name))
@@ -146,7 +147,7 @@
       (clojure.core/get table key)
       (if (some? outer)
         (env-get outer key)
-        (throw (object-exception (str "'" (:name key) "' not found")))))))
+        (mal.core/throw (str "'" (:name key) "' not found"))))))
 
 (defn eval-form [ast env]
   (cond
@@ -321,6 +322,23 @@
               (symbol "macroexpand")
                 (do (assert (= (count args) 1))
                     (macroexpand (first args) env))
+              (symbol "try*")
+                (let [try-form (first args)
+                      catch-form (second args)]
+                  (assert (= (count args) 2))
+                  (assert (= (count catch-form) 3))
+                  (assert (= (first catch-form) (symbol "catch*")))
+                  (try
+                    (eval try-form env)
+                    (catch Throwable ex0
+                      (let [ex-binding (second catch-form)
+                            _ (assert (symbol? ex-binding))
+                            catch-body (nth catch-form 2)
+                            ex (if (object-exception? ex0)
+                                 (object-exception-unwrap ex0)
+                                 ex0)
+                            catch-env (env-make env {ex-binding ex})]
+                        (eval catch-body catch-env)))))
               (let [f (eval head env)
                     args (map (fn [x] (eval x env)) args)]
                 (cond
@@ -436,6 +454,11 @@
     :else (throw (ex-info "`rest` not supported on this type"
                           {:object coll :type (type coll)}))))
 
+(defn throw [obj]
+  (if (instance? Throwable obj)
+    (throw obj)
+    (throw (object-exception obj))))
+
 (def core-ns
   {(symbol "list") clj/list
    (symbol "list?") list?
@@ -468,4 +491,5 @@
    (symbol "macro?") macro?
    (symbol "nth") nth
    (symbol "first") first
-   (symbol "rest") rest})
+   (symbol "rest") rest
+   (symbol "throw") mal.core/throw})
