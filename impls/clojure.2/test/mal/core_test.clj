@@ -53,11 +53,14 @@
 (defn concat$ [& xs]
   (apply list (concat [(sym$ "concat")] xs)))
 
-(defn try$ [expr ex catch-expr]
-  (assert (string? ex))
-  (list (sym$ "try*") expr
-    (list (sym$ "catch*") (sym$ ex)
-      catch-expr)))
+(defn try$
+  ([expr]
+    (list (sym$ "try*") expr))
+  ([expr ex catch-expr]
+    (assert (string? ex))
+    (list (sym$ "try*") expr
+      (list (sym$ "catch*") (sym$ ex)
+        catch-expr))))
 
 (defn throw$ [obj]
   (list (sym$ "throw*") obj))
@@ -495,4 +498,9 @@
                       (try$ (throw$ "e1") "e" (throw$ "e2"))
                       "e" "c2")
                     (core/env-make nil {}))
-         "c2")))
+         "c2"))
+  (try
+    (core/eval (try$ (sym$ "xyz")) (core/env-make nil {}))
+    (catch Throwable ex
+      (is (core/object-exception? ex))
+      (is (= (core/object-exception-unwrap ex) "'xyz' not found")))))

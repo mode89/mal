@@ -323,22 +323,24 @@
                 (do (assert (= (count args) 1))
                     (macroexpand (first args) env))
               (symbol "try*")
-                (let [try-form (first args)
-                      catch-form (second args)]
-                  (assert (= (count args) 2))
-                  (assert (= (count catch-form) 3))
-                  (assert (= (first catch-form) (symbol "catch*")))
-                  (try
-                    (eval try-form env)
-                    (catch Throwable ex0
-                      (let [ex-binding (second catch-form)
-                            _ (assert (symbol? ex-binding))
-                            catch-body (nth catch-form 2)
-                            ex (if (object-exception? ex0)
-                                 (object-exception-unwrap ex0)
-                                 ex0)
-                            catch-env (env-make env {ex-binding ex})]
-                        (eval catch-body catch-env)))))
+                (let [try-expr (first args)]
+                  (if-some [catch-form (second args)]
+                    (do (assert (= (count args) 2))
+                        (assert (= (count catch-form) 3))
+                        (assert (= (first catch-form) (symbol "catch*")))
+                        (try
+                          (eval try-expr env)
+                          (catch Throwable ex0
+                            (let [ex-binding (second catch-form)
+                                  _ (assert (symbol? ex-binding))
+                                  catch-body (nth catch-form 2)
+                                  ex (if (object-exception? ex0)
+                                       (object-exception-unwrap ex0)
+                                       ex0)
+                                  catch-env (env-make env {ex-binding ex})]
+                              (eval catch-body catch-env)))))
+                    (do (assert (= (count args) 1))
+                        (recur try-expr env))))
               (let [f (eval head env)
                     args (map (fn [x] (eval x env)) args)]
                 (cond
