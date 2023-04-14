@@ -69,6 +69,7 @@
   (core/env-make nil
     {(core/symbol "+") +
      (core/symbol "-") -
+     (core/symbol "*") *
      (core/symbol "=") =
      (core/symbol "list") list
      (core/symbol "cons") core/cons
@@ -504,3 +505,34 @@
     (catch Throwable ex
       (is (core/object-exception? ex))
       (is (= (core/object-exception-unwrap ex) "'xyz' not found")))))
+
+(deftest core-apply
+  (let [f (fn [a b c] (+ a (* b 2) (* c 3)))]
+    (is (= (core/apply f (list 1 2 3)) 14))
+    (is (= (core/apply f 2 (list 3 4)) 20))
+    (is (= (core/apply f 3 4 (list 5)) 26))
+    (is (= (core/apply f [1 2 3]) 14))
+    (is (= (core/apply f 2 [3 4]) 20))
+    (is (= (core/apply f 3 4 [5]) 26)))
+  (let [f (core/eval
+            (fn$ (list (sym$ "a") (sym$ "b") (sym$ "c"))
+              (list (sym$ "+") (sym$ "a")
+                               (list (sym$ "*") (sym$ "b") 2)
+                               (list (sym$ "*") (sym$ "c") 3)))
+            basic-env)]
+    (is (= (core/apply f (list 1 2 3)) 14))
+    (is (= (core/apply f 2 (list 3 4)) 20))
+    (is (= (core/apply f 3 4 (list 5)) 26))
+    (is (= (core/apply f [1 2 3]) 14))
+    (is (= (core/apply f 2 [3 4]) 20))
+    (is (= (core/apply f 3 4 [5]) 26))))
+
+(deftest core-map
+  (is-list? (core/map inc (list 1 2 3)) (list 2 3 4))
+  (is-list? (core/map inc [1 2 3]) (list 2 3 4))
+  (let [f (core/eval
+            (fn$ (list (sym$ "x"))
+              (list (sym$ "+") (sym$ "x") 1))
+            basic-env)]
+    (is-list? (core/map f (list 1 2 3)) (list 2 3 4))
+    (is-list? (core/map f [1 2 3]) (list 2 3 4))))

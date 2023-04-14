@@ -9,8 +9,10 @@
             [mal.types])
   (:import [mal.types Atom Function Keyword Symbol]))
 
+(declare apply)
 (declare eval)
 (declare first)
+(declare map)
 (declare nth)
 (declare rest)
 (declare str)
@@ -455,6 +457,33 @@
     (seq? coll) (clj/rest coll)
     :else (throw (ex-info "`rest` not supported on this type"
                           {:object coll :type (type coll)}))))
+
+(defn apply [f & args]
+  (assert (> (count args) 0))
+  (cond
+    (instance? Function f)
+      (let [body (:body f)
+            make-env (:make-env f)]
+        (eval body
+          (make-env (let [rev-args (reverse args)
+                          last-arg (first rev-args)]
+                      (assert (sequential? last-arg))
+                      (reduce
+                        (fn [acc x]
+                          (cons x acc))
+                        last-arg
+                        (rest rev-args))))))
+    (clj/fn? f)
+      (clj/apply clj/apply f args)
+    :else
+      (throw (ex-info "Can't call this" {:object f}))))
+
+(defn map [f coll]
+  (reduce
+    (fn [acc x]
+      (conj acc (apply f [x])))
+    (list)
+    (reverse coll)))
 
 (defn throw [obj]
   (if (instance? Throwable obj)
