@@ -5,7 +5,6 @@
                             symbol symbol? vec vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
-            [mal.environ :as environ]
             [mal.reader :as reader]
             [mal.types])
   (:import [mal.types Atom Function Keyword Symbol]))
@@ -14,6 +13,7 @@
 (declare first)
 (declare nth)
 (declare rest)
+(declare str)
 
 (defn keyword [name]
   (Keyword. name))
@@ -50,6 +50,18 @@
 
 (defn vector? [x]
   (instance? clojure.lang.PersistentVector x))
+
+(def -OBJECT-EXCEPTION (new Object))
+
+(defn object-exception [obj]
+  (ex-info "object exception" {:object obj :tag -OBJECT-EXCEPTION}))
+
+(defn object-exception? [ex]
+  (and (instance? clojure.lang.ExceptionInfo ex)
+       (= -OBJECT-EXCEPTION (-> ex ex-data :tag))))
+
+(defn object-exception-unwrap [ex]
+  (-> ex ex-data :object))
 
 (defn- -pr-char-readable [ch]
   (case ch
@@ -119,10 +131,27 @@
          (clj/println x#))
        x#)))
 
+(defn env-make [outer bindings]
+  (clj/atom {:outer outer
+             :table bindings}))
+
+(defn env-set! [env key value]
+  (clj/swap! env assoc-in [:table key] value))
+
+(defn env-get [env key]
+  (let [e (clj/deref env)
+        table (:table e)
+        outer (:outer e)]
+    (if (contains? table key)
+      (clojure.core/get table key)
+      (if (some? outer)
+        (env-get outer key)
+        (throw (object-exception (str "'" (:name key) "' not found")))))))
+
 (defn eval-form [ast env]
   (cond
     (symbol? ast)
-      (environ/get env ast)
+      (env-get env ast)
     (list? ast)
       (apply list
         (map
@@ -175,7 +204,7 @@
       params
       body
       (fn [args]
-        (environ/make env
+        (env-make env
           (-fn-env-bindings env-template args))))))
 
 (defn quasiquote [ast]
@@ -209,7 +238,7 @@
   (if (list? form)
     (let [head (first form)]
       (if (symbol? head)
-        (if-some [macro (try (environ/get env head)
+        (if-some [macro (try (env-get env head)
                              (catch Exception _ nil))]
           (if (macro? macro)
             (let [args (rest form)
@@ -237,7 +266,7 @@
                   (assert (= (count args) 2))
                   (assert (symbol? name))
                   (let [value (eval value-ast env)]
-                    (environ/set! env name value)
+                    (env-set! env name value)
                     value))
               (symbol "defmacro!")
                 (let [name (first args)
@@ -246,10 +275,10 @@
                   (assert (symbol? name))
                   (assert (fn? f))
                   (let [macro (assoc f :macro? true)]
-                    (environ/set! env name macro)
+                    (env-set! env name macro)
                     macro))
               (symbol "let*")
-                (let [let-env (environ/make env {})
+                (let [let-env (env-make env {})
                       bindings (first args)
                       body (second args)]
                   (assert (even? (count bindings)))
@@ -258,9 +287,7 @@
                       (let [bname (first bs)
                             bvalue (second bs)]
                         (assert (symbol? bname))
-                        (environ/set! let-env
-                                      bname
-                                      (eval bvalue let-env))
+                        (env-set! let-env bname (eval bvalue let-env))
                         (recur (drop 2 bs)))))
                   (recur body let-env))
               (symbol "do")
@@ -349,7 +376,7 @@
   (clj/swap! (:value a)
     (fn [x]
       (eval (clj/apply list f x args)
-            (environ/make nil {})))))
+            (env-make nil {})))))
 
 (defn cons [x xs]
   (cond

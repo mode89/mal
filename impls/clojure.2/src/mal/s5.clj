@@ -1,10 +1,9 @@
 (ns mal.s5
   (:require [mal.core :as core]
-            [mal.environ :as environ]
             [mal.reader :as reader]))
 
 (def repl-env
-  (environ/make
+  (core/env-make
     nil
     core/core-ns))
 

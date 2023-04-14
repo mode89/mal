@@ -1,12 +1,11 @@
 (ns mal.s8
-  (:require [mal.core :as core]
-            [mal.environ :as environ]))
+  (:require [mal.core :as core]))
 
 (def repl-env
-  (environ/make
+  (core/env-make
     nil
     core/core-ns))
-(environ/set! repl-env (core/symbol "eval")
+(core/env-set! repl-env (core/symbol "eval")
   (fn [form]
     (core/eval form repl-env)))
 
@@ -43,7 +42,7 @@
               (cons 'cond (rest (rest xs)))))))")
 
 (defn -main [& args]
-  (environ/set! repl-env (core/symbol "*ARGV*") (apply list (rest args)))
+  (core/env-set! repl-env (core/symbol "*ARGV*") (apply list (rest args)))
   (when-some [filename (first args)]
     (rep (core/str "(load-file \"" filename "\")")))
   (loop []

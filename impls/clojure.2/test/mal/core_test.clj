@@ -1,7 +1,6 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
-            [mal.environ :as environ]
             [mal.test.utils :refer [is-list? is-vector?]])
   (:import [mal.types Function]))
 
@@ -55,7 +54,7 @@
   (apply list (concat [(sym$ "concat")] xs)))
 
 (def basic-env
-  (environ/make nil
+  (core/env-make nil
     {(core/symbol "+") +
      (core/symbol "-") -
      (core/symbol "=") =
@@ -65,53 +64,103 @@
      (core/symbol "vec") core/vec}))
 
 (deftest core-eval
-  (is (= (core/eval 42 (environ/make nil {})) 42))
-  (is (= (core/eval '() (environ/make nil {})) '()))
+  (is (= (core/eval 42 (core/env-make nil {})) 42))
+  (is (= (core/eval '() (core/env-make nil {})) '()))
   (is (= (core/eval (sym$ "a")
-                    (environ/make nil {(sym$ "a") 42}))
+                    (core/env-make nil {(sym$ "a") 42}))
          42))
-  (is (thrown-with-msg? Exception #"Symbol 'a' not found"
-        (core/eval (sym$ "a") (environ/make nil {}))))
+  (try (core/eval (sym$ "a") (core/env-make nil {}))
+    (catch Throwable ex
+      (is (core/object-exception? ex))
+      (is (= (core/object-exception-unwrap ex) "'a' not found"))))
   (is (= (core/eval [1 "2" (sym$ "c")]
-                    (environ/make nil {(sym$ "c") [3 4 5]}))
+                    (core/env-make nil {(sym$ "c") [3 4 5]}))
          [1 "2" [3 4 5]]))
   (is (= (core/eval {1 "2" 3 (sym$ "c")}
-                    (environ/make nil {(sym$ "c") [4 5 6]}))
+                    (core/env-make nil {(sym$ "c") [4 5 6]}))
          {1 "2" 3 [4 5 6]}))
   (is (= (core/eval (list (sym$ "foo") 7 (sym$ "bar"))
-           (environ/make nil
+           (core/env-make nil
              {(sym$ "foo") (fn [x y] (+ x y))
               (sym$ "bar") 42}))
          49)))
 
+(deftest env-make
+  (is (= (deref (core/env-make nil {})) {:outer nil :table {}}))
+  (is (= (deref (core/env-make nil {(core/symbol "a") 1
+                                    (core/symbol "b") 2}))
+         {:outer nil :table {(core/symbol "a") 1
+                             (core/symbol "b") 2}}))
+  (let [outer-env (core/env-make nil {(core/symbol "a") 1
+                                      (core/symbol "b") 2})
+        env (core/env-make outer-env {(core/symbol "c") 3
+                                      (core/symbol "d") 4})]
+    (is (= (deref env) {:outer outer-env
+                        :table {(core/symbol "c") 3
+                                (core/symbol "d") 4}}))
+    (is (= (deref outer-env) {:outer nil
+                              :table {(core/symbol "a") 1
+                                      (core/symbol "b") 2}}))))
+
+(deftest env-set!
+  (let [env (core/env-make nil {})]
+    (core/env-set! env (core/symbol "a") 1)
+    (is (= (deref env) {:outer nil :table {(core/symbol "a") 1}})))
+  (let [env (core/env-make nil {(core/symbol "a") 1})]
+    (core/env-set! env (core/symbol "a") 2)
+    (is (= (deref env) {:outer nil :table {(core/symbol "a") 2}})))
+  (let [env (core/env-make nil {(core/symbol "a") 1})]
+    (core/env-set! env (core/symbol "b") 2)
+    (is (= (deref env) {:outer nil
+                        :table {(core/symbol "a") 1
+                                (core/symbol "b") 2}})))
+  (let [outer-env (core/env-make nil {(core/symbol "a") 1})
+        env (core/env-make outer-env {(core/symbol "b") 2})]
+    (core/env-set! env (core/symbol "a") 3)
+    (is (= (deref env) {:outer outer-env
+                        :table {(core/symbol "b") 2
+                                (core/symbol "a") 3}}))
+    (is (= (deref outer-env) {:outer nil :table {(core/symbol "a") 1}}))))
+
+(deftest env-get
+  (let [env (core/env-make nil {(core/symbol "a") 1})]
+    (is (= (core/env-get env (core/symbol "a")) 1))
+    (try (core/env-get env (core/symbol "b"))
+      (catch Throwable ex
+        (is (core/object-exception? ex))
+        (is (= (core/object-exception-unwrap ex) "'b' not found")))))
+  (let [outer-env (core/env-make nil {(core/symbol "a") 1})
+        env (core/env-make outer-env {(core/symbol "b") 2})]
+    (is (= (core/env-get env (core/symbol "a")) 1))))
+
 (deftest eval-def
-  (let [env (environ/make nil {})]
+  (let [env (core/env-make nil {})]
     (is (= (core/eval (def$ "a" 42) env) 42))
     (is (= (deref env) {:outer nil :table {(sym$ "a") 42}})))
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (is (= (core/eval (def$ "a" (list (sym$ "+") 1 2)) env) 3))
     (is (= (deref env) {:outer basic-env :table {(sym$ "a") 3}})))
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (is (= (core/eval (def$ "a" (list (sym$ "list") 1 2)) env)
            (list 1 2)))
     (is (= (deref env) {:outer basic-env :table {(sym$ "a") (list 1 2)}}))))
 
 (deftest eval-let
-  (is (= (core/eval (let$ '() 42) (environ/make nil {})) 42))
-  (let [env (environ/make nil {})]
+  (is (= (core/eval (let$ '() 42) (core/env-make nil {})) 42))
+  (let [env (core/env-make nil {})]
     (is (= (core/eval (let$ (list (sym$ "a") 42)
                         (sym$ "a"))
                       env)
            42))
     (is (= (deref env) {:outer nil :table {}})))
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (is (= (core/eval (let$ (list (sym$ "a") 1
                                   (sym$ "b") 2)
                         (list (sym$ "+") (sym$ "a") (sym$ "b")))
                       env)
            3))
     (is (= (deref env) {:outer basic-env :table {}})))
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (is (= (core/eval (let$ (list (sym$ "a") 1
                                   (sym$ "b") (list (sym$ "+") (sym$ "a") 1)
                                   (sym$ "c") (list (sym$ "+")
@@ -122,47 +171,47 @@
            3))))
 
 (deftest eval-do
-  (is (= (core/eval (do$) (environ/make nil {})) nil))
-  (is (= (core/eval (do$ 42) (environ/make nil {})) 42))
-  (is (= (core/eval (do$ 42 7 9001) (environ/make nil {})) 9001))
-  (let [env (environ/make nil {})]
+  (is (= (core/eval (do$) (core/env-make nil {})) nil))
+  (is (= (core/eval (do$ 42) (core/env-make nil {})) 42))
+  (is (= (core/eval (do$ 42 7 9001) (core/env-make nil {})) 9001))
+  (let [env (core/env-make nil {})]
     (is (= (core/eval (do$ (def$ "a" 42) (sym$ "a")) env) 42))
     (is (= (deref env) {:outer nil :table {(sym$ "a") 42}}))))
 
 (deftest eval-if
-  (is (= (core/eval (if$ true 1 2) (environ/make nil {})) 1))
-  (is (= (core/eval (if$ false 1 2) (environ/make nil {})) 2))
-  (is (= (core/eval (if$ true 1) (environ/make nil {})) 1))
-  (is (= (core/eval (if$ false 1) (environ/make nil {})) nil))
-  (let [env (environ/make nil {})]
+  (is (= (core/eval (if$ true 1 2) (core/env-make nil {})) 1))
+  (is (= (core/eval (if$ false 1 2) (core/env-make nil {})) 2))
+  (is (= (core/eval (if$ true 1) (core/env-make nil {})) 1))
+  (is (= (core/eval (if$ false 1) (core/env-make nil {})) nil))
+  (let [env (core/env-make nil {})]
     (is (= (core/eval (if$ true (def$ "a" 1) (def$ "b" 2)) env) 1))
     (is (= (deref env) {:outer nil :table {(sym$ "a") 1}})))
-  (let [env (environ/make nil {})]
+  (let [env (core/env-make nil {})]
     (is (= (core/eval (if$ false (def$ "a" 1) (def$ "b" 2)) env) 2))
     (is (= (deref env) {:outer nil :table {(sym$ "b") 2}}))))
 
 (deftest eval-fn
-  (is (instance? Function (core/eval (fn$ '() 42) (environ/make nil {}))))
-  (is (= (core/eval (list (fn$ '() 42)) (environ/make nil {})) 42))
+  (is (instance? Function (core/eval (fn$ '() 42) (core/env-make nil {}))))
+  (is (= (core/eval (list (fn$ '() 42)) (core/env-make nil {})) 42))
   (is (= (core/eval (list (fn$ (list (sym$ "x"))
                                (sym$ "x"))
                           42)
-                    (environ/make nil {}))
+                    (core/env-make nil {}))
          42))
-  (let [env (environ/make nil {(sym$ "x") 42})]
+  (let [env (core/env-make nil {(sym$ "x") 42})]
     (is (= (core/eval (list (fn$ (list (sym$ "x"))) 42) env) nil))
     (is (= (deref env) {:outer nil :table {(sym$ "x") 42}})))
-  (let [env (environ/make nil {(sym$ "x") 42})]
+  (let [env (core/env-make nil {(sym$ "x") 42})]
     (is (= (core/eval (list (fn$ (list (sym$ "x")) (sym$ "x")) 43) env) 43))
     (is (= (deref env) {:outer nil :table {(sym$ "x") 42}})))
   (is (= (core/eval (list (fn$ (list (sym$ "x") (sym$ "y"))
                             (list (sym$ "+") (sym$ "x") (sym$ "y")))
                           1 2)
-                    (environ/make basic-env {}))
+                    (core/env-make basic-env {}))
          3))
   (is (= (core/eval (list (fn$ (list (sym$ "&") (sym$ "xs")) (sym$ "xs"))
                           1 2 3 4 5)
-                    (environ/make nil {}))
+                    (core/env-make nil {}))
          [1 2 3 4 5])))
 
 (deftest core-pr-str
@@ -178,7 +227,7 @@
   (is (= (core/str "a\"b") "a\"b")))
 
 (deftest eval-tail-call-optimization
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (core/eval
       (def$ "foo" (fn$ (list (sym$ "n"))
                     (if$ (list (sym$ "=") (sym$ "n") 0)
@@ -237,29 +286,29 @@
 (deftest eval-quote
   (is (= (core/eval
            (list (core/symbol "quote") 42)
-           (environ/make nil {}))
+           (core/env-make nil {}))
          42))
   (is (= (core/eval
            (list (core/symbol "quote") (list 1 2 3))
-           (environ/make nil {}))
+           (core/env-make nil {}))
          (list 1 2 3)))
   (is (= (core/eval
            (list (core/symbol "quote") (core/symbol "foo"))
-           (environ/make nil {}))
+           (core/env-make nil {}))
          (core/symbol "foo")))
   (is (= (core/eval
            (list (core/symbol "quote") (list (core/symbol "quote") 42))
-           (environ/make nil {}))
+           (core/env-make nil {}))
          (list (core/symbol "quote") 42)))
   (is (= (core/eval
            (list (core/symbol "quote") [1 2 3])
-           (environ/make nil {}))
+           (core/env-make nil {}))
          [1 2 3]))
   (is (= (core/eval
            (list (core/symbol "quote")
                  {(core/keyword "a") 1
                   (core/keyword "b") 2})
-           (environ/make nil {}))
+           (core/env-make nil {}))
          {(core/keyword "a") 1
           (core/keyword "b") 2})))
 
@@ -279,8 +328,8 @@
          (concat$ (sym$ "foo") (cons$ 42 '())))))
 
 (deftest eval-quasiquote
-  (let [env (environ/make basic-env {(sym$ "x") 42
-                                     (sym$ "l") (list 1 2 3)})
+  (let [env (core/env-make basic-env {(sym$ "x") 42
+                                      (sym$ "l") (list 1 2 3)})
         eval-qq (fn [form] (core/eval (qq$ form) env))]
     (is (= (eval-qq 42) 42))
     (is (= (eval-qq (sym$ "x")) (sym$ "x")))
@@ -311,7 +360,7 @@
            (list 0 (sym$ "splice-unquote"))))))
 
 (deftest eval-defmacro
-  (let [env (environ/make nil {})
+  (let [env (core/env-make nil {})
         params (list (sym$ "x"))
         body (qq$ (list (list (sym$ "unquote") (sym$ "x"))
                         (list (sym$ "unquote") (sym$ "x"))))]
@@ -330,28 +379,28 @@
             :body body}))))
 
 (deftest core-macroexpand
-  (is (= (core/macroexpand 42 (environ/make nil {})) 42))
-  (is (= (core/macroexpand (list 1 2) (environ/make nil {})) (list 1 2)))
+  (is (= (core/macroexpand 42 (core/env-make nil {})) 42))
+  (is (= (core/macroexpand (list 1 2) (core/env-make nil {})) (list 1 2)))
   (is (= (core/macroexpand
            (list (sym$ "x") 42)
-           (environ/make nil {}))
+           (core/env-make nil {}))
          (list (sym$ "x") 42)))
   (is (= (core/macroexpand
            (list (sym$ "x") 1)
-           (environ/make nil {(sym$ "x") 2}))
+           (core/env-make nil {(sym$ "x") 2}))
          (list (sym$ "x") 1)))
   (is (= (core/macroexpand
            (list (sym$ "dup") (sym$ "x"))
-           (environ/make nil
+           (core/env-make nil
               {(sym$ "dup")
-                 (core/make-fn* true (environ/make basic-env {})
+                 (core/make-fn* true (core/env-make basic-env {})
                    (list (sym$ "arg"))
                    (qq$ (list (unq$ (sym$ "arg"))
                               (unq$ (sym$ "arg")))))}))
          (list (sym$ "x") (sym$ "x")))))
 
 (deftest eval-macro
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (core/eval
       (defmacro$ "unless"
         (fn$ (list (sym$ "pred") (sym$ "then") (sym$ "else"))
@@ -366,13 +415,13 @@
       env)
     (is (= (->> env deref :table keys (map :name) sort) ["a" "unless"]))
     (is (= (-> env deref :table (get (sym$ "a"))) 1)))
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (core/eval
       (defmacro$ "just" (fn$ (list (sym$ "x"))
                           (qq$ (unq$ (sym$ "x")))))
       env)
     (is (= (core/eval (list (sym$ "just") 42) env) 42)))
-  (let [env (environ/make basic-env {})]
+  (let [env (core/env-make basic-env {})]
     (core/eval
       (defmacro$ "identity" (fn$ (list (sym$ "x"))
                               (sym$ "x")))
