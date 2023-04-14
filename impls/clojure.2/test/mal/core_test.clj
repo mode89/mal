@@ -5,6 +5,27 @@
             [mal.test.utils :refer [is-list? is-vector?]])
   (:import [mal.types Function]))
 
+(defn sym$ [name]
+  (core/symbol name))
+
+(defn qq$ [form]
+  (list (sym$ "quasiquote") form))
+
+(defn unq$ [form]
+  (list (sym$ "unquote") form))
+
+(defn def$ [name value]
+  (list (sym$ "def!") (sym$ name) value))
+
+(defn if$ [pred then else]
+  (list (sym$ "if") pred then else))
+
+(defn fn$ [params body]
+  (list (sym$ "fn*") params body))
+
+(defn defmacro$ [name value]
+  (list (sym$ "defmacro!") (sym$ name) value))
+
 (def basic-env
   (environ/make nil
     {(core/symbol "+") +
@@ -374,3 +395,67 @@
            (list 0 (core/symbol "unquote"))))
     (is (= (eval-qq (list 0 (core/symbol "splice-unquote")))
            (list 0 (core/symbol "splice-unquote"))))))
+
+(deftest eval-defmacro
+  (let [env (environ/make nil {})
+        params (list (sym$ "x"))
+        body (qq$ (list (list (sym$ "unquote") (sym$ "x"))
+                        (list (sym$ "unquote") (sym$ "x"))))]
+    (core/eval
+      (defmacro$ "dup" (fn$ params body))
+      env)
+    (is (nil? (-> env deref :outer)))
+    (is (= (-> env deref :table count) 1))
+    (is (= (-> env
+               deref
+               :table
+               (get (sym$ "dup"))
+               (select-keys [:macro? :params :body]))
+           {:macro? true
+            :params params
+            :body body}))))
+
+(deftest core-macroexpand
+  (is (= (core/macroexpand 42 (environ/make nil {})) 42))
+  (is (= (core/macroexpand (list 1 2) (environ/make nil {})) (list 1 2)))
+  (is (= (core/macroexpand
+           (list (sym$ "x") 42)
+           (environ/make nil {}))
+         (list (sym$ "x") 42)))
+  (is (= (core/macroexpand
+           (list (sym$ "x") 1)
+           (environ/make nil {(sym$ "x") 2}))
+         (list (sym$ "x") 1)))
+  (is (= (core/macroexpand
+           (list (sym$ "dup") (sym$ "x"))
+           (environ/make nil
+              {(sym$ "dup")
+                 (core/make-fn* true (environ/make basic-env {})
+                   (list (sym$ "arg"))
+                   (qq$ (list (unq$ (sym$ "arg"))
+                              (unq$ (sym$ "arg")))))}))
+         (list (sym$ "x") (sym$ "x")))))
+
+(deftest eval-macro
+  (let [env (environ/make basic-env {})]
+    (core/eval
+      (defmacro$ "unless"
+        (fn$ (list (sym$ "pred") (sym$ "then") (sym$ "else"))
+          (if$ (sym$ "pred")
+            (qq$ (unq$ (sym$ "else")))
+            (qq$ (unq$ (sym$ "then"))))))
+      env)
+    (core/eval
+      (list (sym$ "unless") false
+        (def$ "a" 1)
+        (def$ "b" 2))
+      env)
+    (is (= (->> env deref :table keys (map :name) sort) ["a" "unless"]))
+    (is (= (-> env deref :table (get (sym$ "a"))) 1)))
+  (let [env (environ/make basic-env {})]
+    (core/eval
+      (defmacro$ "just"
+        (fn$ (list (sym$ "x"))
+          (qq$ (unq$ (sym$ "x")))))
+      env)
+    (is (= (core/eval (list (sym$ "just") 42) env) 42))))

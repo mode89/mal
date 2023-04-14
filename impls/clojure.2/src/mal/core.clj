@@ -1,7 +1,8 @@
 (ns mal.core
   (:refer-clojure :exclude [atom concat cons deref eval fn? keyword keyword?
-                            list?  pr-str prn println read-string reset!
-                            slurp str swap!  symbol symbol? vec vector?])
+                            list? macroexpand pr-str prn println read-string
+                            reset!  slurp str swap!  symbol symbol? vec
+                            vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.environ :as environ]
@@ -27,8 +28,13 @@
   (instance? clojure.lang.PersistentArrayMap x))
 
 (defn fn? [x]
-  (or (instance? Function x)
+  (or (and (instance? Function x)
+           (not (:macro? x)))
       (clj/fn? x)))
+
+(defn macro? [x]
+  (and (instance? Function x)
+       (:macro? x)))
 
 (defn atom [x]
   (new Atom (clj/atom x)))
@@ -90,6 +96,8 @@
                \} )
     (fn? object)
       (clj/str "#<function " (clj/str object) ">")
+    (macro? object)
+      (clj/str "#<macro " (clj/str object) ">")
     (atom? object)
       (clj/str "(atom " (-> object :value clj/deref) ")")
     :else
@@ -157,6 +165,16 @@
     {}
     env-template))
 
+(defn make-fn* [macro? env params body]
+  (let [env-template (-fn-env-template params)]
+    (new Function
+      macro?
+      params
+      body
+      (fn [args]
+        (environ/make env
+          (-fn-env-bindings env-template args))))))
+
 (defn quasiquote [ast]
   (if (list? ast)
     (cond
@@ -184,84 +202,107 @@
       :else
         ast)))
 
-(defn eval [form env]
+(defn macroexpand [form env]
   (if (list? form)
-    (if (empty? form)
-      form
-      (let [head (first form)
-            args (rest form)]
-        (condp = head
-          (symbol "def!")
-            (let [name (first args)
-                  value-ast (second args)]
-              (assert (= (count args) 2))
-              (assert (symbol? name))
-              (let [value (eval value-ast env)]
-                (environ/set! env name value)
-                value))
-          (symbol "let*")
-            (let [let-env (environ/make env {})
-                  bindings (first args)
-                  body (second args)]
-              (assert (even? (count bindings)))
-              (loop [bs bindings]
-                (when (>= (count bs) 2)
-                  (let [bname (first bs)
-                        bvalue (second bs)]
-                    (assert (symbol? bname))
-                    (environ/set! let-env
-                                  bname
-                                  (eval bvalue let-env))
-                    (recur (drop 2 bs)))))
-              (recur body let-env))
-          (symbol "do")
-            (let [butlast-forms (butlast args)
-                  last-form (last args)]
-              (loop [forms butlast-forms]
-                (when-some [form (first forms)]
-                  (eval form env)
-                  (recur (rest forms))))
-              (eval last-form env))
-          (symbol "if")
-            (let [nargs (count args)]
-              (assert (>= nargs 2))
-              (assert (<= nargs 3))
-              (if (eval (first args) env)
-                (recur (second args) env)
-                (if (= nargs 3)
-                  (recur (nth args 2) env)
-                  nil)))
-          (symbol "fn*")
-            (let [params (first args)
-                  body (second args)
-                  env-template (-fn-env-template params)]
-              (new Function
-                params
-                body
-                (fn [args]
-                  (environ/make env
-                    (-fn-env-bindings env-template args)))))
-          (symbol "quote")
-            (do (assert (= (count args) 1))
-                (first args))
-          (symbol "quasiquote")
-            (do (assert (= (count args) 1))
-                (recur (quasiquote (first args)) env))
-          (symbol "quasiquoteexpand")
-            (do (assert (= (count args) 1))
-                (quasiquote (first args)))
-          (let [f (eval head env)
-                args (map (fn [x] (eval x env)) args)]
-            (cond
-              (instance? Function f)
-                (let [body (:body f)
-                      make-env (:make-env f)]
-                  (recur body (make-env args)))
-              (clj/fn? f)
-                (apply f args)
-              :else
-                (throw (ex-info "Can't call this" {:object f})))))))
-    (eval-form form env)))
+    (let [head (first form)]
+      (if (symbol? head)
+        (if-some [macro (try (environ/get env head)
+                             (catch Exception _ nil))]
+          (if (macro? macro)
+            (let [args (rest form)
+                  body (:body macro)
+                  make-env (:make-env macro)]
+              (recur (eval body (make-env args)) env))
+            form)
+          form)
+        form))
+    form))
+
+(defn eval [form0 env]
+  (if (list? form0)
+    (if (empty? form0)
+      form0
+      (let [form (macroexpand form0 env)]
+        (if (not (list? form))
+          form
+          (let [head (first form)
+                args (rest form)]
+            (condp = head
+              (symbol "def!")
+                (let [name (first args)
+                      value-ast (second args)]
+                  (assert (= (count args) 2))
+                  (assert (symbol? name))
+                  (let [value (eval value-ast env)]
+                    (environ/set! env name value)
+                    value))
+              (symbol "defmacro!")
+                (let [name (first args)
+                      f (eval (second args) env)]
+                  (assert (= (count args) 2))
+                  (assert (symbol? name))
+                  (assert (fn? f))
+                  (let [macro (assoc f :macro? true)]
+                    (environ/set! env name macro)
+                    macro))
+              (symbol "let*")
+                (let [let-env (environ/make env {})
+                      bindings (first args)
+                      body (second args)]
+                  (assert (even? (count bindings)))
+                  (loop [bs bindings]
+                    (when (>= (count bs) 2)
+                      (let [bname (first bs)
+                            bvalue (second bs)]
+                        (assert (symbol? bname))
+                        (environ/set! let-env
+                                      bname
+                                      (eval bvalue let-env))
+                        (recur (drop 2 bs)))))
+                  (recur body let-env))
+              (symbol "do")
+                (let [butlast-forms (butlast args)
+                      last-form (last args)]
+                  (loop [forms butlast-forms]
+                    (when-some [form (first forms)]
+                      (eval form env)
+                      (recur (rest forms))))
+                  (eval last-form env))
+              (symbol "if")
+                (let [nargs (count args)]
+                  (assert (>= nargs 2))
+                  (assert (<= nargs 3))
+                  (if (eval (first args) env)
+                    (recur (second args) env)
+                    (if (= nargs 3)
+                      (recur (nth args 2) env)
+                      nil)))
+              (symbol "fn*")
+                (make-fn* false env (first args) (second args))
+              (symbol "quote")
+                (do (assert (= (count args) 1))
+                    (first args))
+              (symbol "quasiquote")
+                (do (assert (= (count args) 1))
+                    (recur (quasiquote (first args)) env))
+              (symbol "quasiquoteexpand")
+                (do (assert (= (count args) 1))
+                    (quasiquote (first args)))
+              (symbol "macroexpand")
+                (do (assert (= (count args) 1))
+                    (macroexpand (first args) env))
+              (let [f (eval head env)
+                    args (map (fn [x] (eval x env)) args)]
+                (cond
+                  (instance? Function f)
+                    (let [body (:body f)
+                          make-env (:make-env f)]
+                      (recur body (make-env args)))
+                  (clj/fn? f)
+                    (apply f args)
+                  :else
+                    (throw (ex-info "Can't call this" {:object f})))))))))
+    (eval-form form0 env)))
 
 (defn pr-str [& args]
   (join " "
@@ -366,4 +407,6 @@
    (symbol "swap!") swap!
    (symbol "cons") cons
    (symbol "concat") concat
-   (symbol "vec") vec})
+   (symbol "vec") vec
+   (symbol "fn?") fn?
+   (symbol "macro?") macro?})
