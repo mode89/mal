@@ -1,8 +1,9 @@
 (ns mal.core
-  (:refer-clojure :exclude [atom concat cons deref eval first fn? keyword
-                            keyword? list? macroexpand nth pr-str prn
-                            println read-string reset! rest slurp str swap!
-                            symbol symbol? vec vector?])
+  (:refer-clojure :exclude [apply atom concat cons deref eval first fn? keys
+                            keyword keyword? list? macroexpand map map? nth
+                            pr-str prn println read-string reset! rest
+                            sequential?  slurp str swap! symbol symbol? vals
+                            vec vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.reader :as reader]
@@ -19,7 +20,9 @@
 (declare throw)
 
 (defn keyword [name]
-  (Keyword. name))
+  (if (instance? Keyword name)
+    name
+    (new Keyword name)))
 
 (defn keyword? [x]
   (instance? Keyword x))
@@ -30,8 +33,9 @@
 (defn symbol? [x]
   (instance? Symbol x))
 
-(defn hash-map? [x]
-  (instance? clojure.lang.PersistentArrayMap x))
+(defn map? [x]
+  (or (instance? clojure.lang.PersistentArrayMap x)
+      (instance? clojure.lang.PersistentHashMap x)))
 
 (defn fn? [x]
   (or (and (instance? Function x)
@@ -53,6 +57,10 @@
 
 (defn vector? [x]
   (instance? clojure.lang.PersistentVector x))
+
+(defn sequential? [x]
+  (or (list? x)
+      (vector? x)))
 
 (def -OBJECT-EXCEPTION (new Object))
 
@@ -105,7 +113,7 @@
                         (pr-object x print-readably))
                       object))
                \] )
-    (hash-map? object)
+    (map? object)
       (clj/str \{
                (join " "
                  (map (fn [x]
@@ -119,7 +127,7 @@
     (atom? object)
       (clj/str "(atom " (-> object :value clj/deref) ")")
     :else
-      (throw (ex-info "Don't know how to print this" {:object object}))))
+      (clj/str "#<" (clj/pr-str (type object)) " " (clj/pr-str object) ">")))
 
 (defn debug-macro [x]
   (let [m (meta x)
@@ -163,7 +171,7 @@
           ast))
     (vector? ast)
       (clj/vec (map (fn [x] (eval x env)) ast))
-    (hash-map? ast)
+    (map? ast)
       (into {}
         (map
           (fn [[k v]]
@@ -229,7 +237,7 @@
                   (quasiquote element)
                   (quasiquote (rest ast))))))
     (cond
-      (or (symbol? ast) (hash-map? ast))
+      (or (symbol? ast) (map? ast))
         (list (symbol "quote") ast)
       (vector? ast)
         (list (symbol "vec")
@@ -485,6 +493,16 @@
     (list)
     (reverse coll)))
 
+(defn keys [m]
+  (if-some [ks (clj/keys m)]
+    (apply list ks)
+    (list)))
+
+(defn vals [m]
+  (if-some [vs (clj/vals m)]
+    (apply list vs)
+    (list)))
+
 (defn throw [obj]
   (if (instance? Throwable obj)
     (throw obj)
@@ -523,4 +541,24 @@
    (symbol "nth") nth
    (symbol "first") first
    (symbol "rest") rest
-   (symbol "throw") mal.core/throw})
+   (symbol "throw") mal.core/throw
+   (symbol "apply") apply
+   (symbol "map") map
+   (symbol "nil?") clj/nil?
+   (symbol "true?") clj/true?
+   (symbol "false?") clj/false?
+   (symbol "symbol") symbol
+   (symbol "symbol?") symbol?
+   (symbol "keyword") keyword
+   (symbol "keyword?") keyword?
+   (symbol "vector") clj/vector
+   (symbol "vector?") vector?
+   (symbol "sequential?") sequential?
+   (symbol "hash-map") clj/hash-map
+   (symbol "map?") map?
+   (symbol "assoc") clj/assoc
+   (symbol "dissoc") clj/dissoc
+   (symbol "get") clj/get
+   (symbol "contains?") clj/contains?
+   (symbol "keys") keys
+   (symbol "vals") vals})

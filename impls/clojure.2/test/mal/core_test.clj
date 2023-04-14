@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.test.utils :refer [is-list? is-vector?]])
-  (:import [mal.types Function]))
+  (:import [mal.types Function Keyword]))
 
 (defn sym$ [name]
   (assert (string? name))
@@ -536,3 +536,16 @@
             basic-env)]
     (is-list? (core/map f (list 1 2 3)) (list 2 3 4))
     (is-list? (core/map f [1 2 3]) (list 2 3 4))))
+
+(deftest core-keys
+  (is-list? (core/keys {}) (list))
+  (is-list? (core/keys {"a" 1}) (list "a")))
+
+(deftest core-vals
+  (is-list? (core/vals {}) (list))
+  (is-list? (core/vals {"a" 1}) (list 1)))
+
+(deftest core-keyword
+  (is (instance? Keyword (core/keyword "a")))
+  (is (= (:name (core/keyword "abc")) "abc"))
+  (is (= (core/keyword (core/keyword "xyz")) (core/keyword "xyz"))))

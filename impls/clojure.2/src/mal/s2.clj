@@ -24,7 +24,7 @@
           ast))
     (vector? ast)
       (vec (map (fn [x] (EVAL x env)) ast))
-    (core/hash-map? ast)
+    (core/map? ast)
       (into {}
         (map
           (fn [[k v]]
