@@ -18,6 +18,7 @@
            :extra-deps {cloverage/cloverage {:mvn/version "1.2.4"}}
            :main-opts ["--main" "cloverage.coverage"
                        "--src-ns-path" "src"
-                       "--test-ns-path" "test"]}
+                       "--test-ns-path" "test"
+                       "--ns-exclude-regex" "mal.s\\d"]}
    :test {:extra-paths ["test"]
           :main-opts ["--main" "mal.run-tests"]}}}
