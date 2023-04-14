@@ -380,10 +380,10 @@
     :else (throw (ex-info "Can't convert to vector" {:object l}))))
 
 (def core-ns
-  {(symbol "list") list
+  {(symbol "list") clj/list
    (symbol "list?") list?
-   (symbol "empty?") empty?
-   (symbol "count") count
+   (symbol "empty?") clj/empty?
+   (symbol "count") clj/count
    (symbol "=") =
    (symbol "<") <
    (symbol "<=") <=
@@ -393,7 +393,7 @@
    (symbol "-") -
    (symbol "*") *
    (symbol "/") /
-   (symbol "not") not
+   (symbol "not") clj/not
    (symbol "pr-str") pr-str
    (symbol "prn") prn
    (symbol "str") str
