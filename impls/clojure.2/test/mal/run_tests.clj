@@ -4,7 +4,8 @@
             [mal.lexer-test]
             [mal.parsing-test]
             [mal.printer-test]
-            [mal.reader-test]))
+            [mal.reader-test]
+            [mal.python.compiler-test]))
 
 (defn -main [& _args]
   (run-all-tests #"mal.*-test"))
