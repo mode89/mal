@@ -1,5 +1,5 @@
 (ns mal.python.compiler
-  (:require [clojure.string :refer [join split-lines]]))
+  (:require [clojure.string :refer [join split-lines triml]]))
 
 (defn indent [s prefix]
   (assert (string? s))
@@ -12,87 +12,105 @@
 (defn indent1 [s]
   (indent s "  "))
 
+(defmacro assert-symbol [s]
+  `(let [s# ~s]
+     (assert (string? s#))
+     (assert (not-any? (fn [c#] (= c# \newline)) s#))
+     (assert (-> s# triml seq))))
+
+(defmacro assert-line [s]
+  `(let [s# ~s]
+     (assert (string? s#))
+     (assert (not-any? (fn [c#] (= c# \newline)) s#))
+     (assert (-> s# triml seq))))
+
+(defn indent-lines [lines prefix]
+  (map (fn [line]
+         (assert-line line)
+         (str prefix line))
+       lines))
+
+(defn indent-lines1 [lines]
+  (indent-lines lines "  "))
+
 (defn emit-assign [name value]
-  (assert (string? name))
-  (assert (string? value))
-  (str name " = " value))
+  (assert-symbol name)
+  (assert-line value)
+  [(str name " = " value)])
 
 (defn emit-call [name args kwargs]
-  (assert (string? name))
-  (assert (seqable? args))
+  (assert-symbol name)
   (assert (map? kwargs))
   (let [kwargs* (sort (map (fn [[k v]]
-                             (assert (string? k))
-                             (assert (string? v))
+                             (assert-symbol k)
+                             (assert-line v)
                              (str k "=" v))
                            kwargs))]
-    (str name "(" (join ", " (concat args kwargs*)) ")")))
-
-(defn emit-return [value]
-  (assert (string? value))
-  (str "return " value))
+    [(str name "(" (join ", " (concat args kwargs*)) ")")]))
 
 (defn emit-if [condition then elifs else]
-  (assert (string? condition))
-  (assert (string? then))
-  (str "if " condition ":\n"
-       (indent1 then)
-       (when (some? elifs)
-         (assert (seqable? elifs))
-         (str "\n" (join "\n"
-                     (map (fn [[condition body]]
-                            (assert (string? condition))
-                            (assert (string? body))
-                            (str "elif " condition ":\n"
-                                 (indent1 body)))
-                          elifs))))
-       (when (some? else)
-         (assert (string? else))
-         (str "\nelse:\n"
-              (indent1 else)))))
+  (assert-line condition)
+  (assert (seq then))
+  (concat
+    [(str "if " condition ":")]
+    (indent-lines1 then)
+    (when (some? elifs)
+      (mapcat
+        (fn [[condition body]]
+          (assert-line condition)
+          (assert (seq body))
+          (cons (str "elif " condition ":")
+                (indent-lines1 body)))
+        elifs))
+    (when (some? else)
+      (assert (seq else))
+      (cons "else:" (indent-lines1 else)))))
 
 (defn emit-while [condition body]
-  (assert (string? condition))
-  (assert (string? body))
-  (str "while " condition ":\n"
-       (indent1 body)))
+  (assert-line condition)
+  (assert (seq body))
+  (cons (str "while " condition ":")
+        (indent-lines1 body)))
 
 (defn emit-break []
-  "break")
+  ["break"])
 
 (defn emit-continue []
-  "continue")
+  ["continue"])
 
 (defn emit-def [name params body]
-  (assert (string? name))
-  (assert (seqable? params))
-  (assert (string? body))
-  (str "def " name "(" (join ", "
-                          (map (fn [param]
-                                 (assert (string? param))
-                                 param)
-                               params)) "):\n"
-       (indent1 body)))
+  (assert-symbol name)
+  (assert (seq body))
+  (let [params* (map (fn [param]
+                       (assert-symbol param)
+                       param)
+                     params)]
+    (cons
+      (str "def " name "(" (join ", " params*) "):")
+      (indent-lines1 body))))
+
+(defn emit-return [value]
+  (assert-line value)
+  [(str "return " value)])
 
 (defn emit-try [body excepts finally]
-  (assert (string? body))
-  (assert (seqable? excepts))
-  (str "try:\n"
-       (indent1 body)
-       (when (some? excepts)
-         (assert (seqable? excepts))
-         (str "\n" (join "\n"
-                     (map (fn [[exception binding body]]
-                            (assert (string? exception))
-                            (assert (string? body))
-                            (str "except " exception
-                                 (when (some? binding)
-                                   (assert (string? binding))
-                                   (str " as " binding))
-                                 ":\n"
-                                 (indent1 body)))
-                          excepts))))
-       (when (some? finally)
-         (assert (string? finally))
-         (str "\nfinally:\n"
-              (indent1 finally)))))
+  (assert (seq body))
+  (concat
+    ["try:"]
+    (indent-lines1 body)
+    (when (some? excepts)
+      (mapcat
+        (fn [[exception binding body]]
+          (assert-symbol exception)
+          (assert (seq body))
+          (cons
+            (str "except " exception
+                 (when (some? binding)
+                   (assert-symbol binding)
+                   (str " as " binding))
+                 ":")
+            (indent-lines1 body)))
+           excepts))
+    (when (some? finally)
+      (assert (seq finally))
+      (cons "finally:" (indent-lines1 finally)))))
