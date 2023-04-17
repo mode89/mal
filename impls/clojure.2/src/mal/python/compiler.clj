@@ -1,16 +1,5 @@
 (ns mal.python.compiler
-  (:require [clojure.string :refer [join split-lines triml]]))
-
-(defn indent [s prefix]
-  (assert (string? s))
-  (assert (string? prefix))
-  (join "\n"
-    (map (fn [line]
-           (str prefix line))
-         (split-lines s))))
-
-(defn indent1 [s]
-  (indent s "  "))
+  (:require [clojure.string :refer [join triml]]))
 
 (defmacro assert-symbol [s]
   `(let [s# ~s]
@@ -114,3 +103,69 @@
     (when (some? finally)
       (assert (seq finally))
       (cons "finally:" (indent-lines1 finally)))))
+
+(defn emit
+  "Emit list of python source lines for the given python-like AST."
+  [ast]
+  (let [tag (first ast)]
+    (assert (keyword? tag))
+    (case tag
+      ; Assign an expression to a variable
+      :assign (let [[name value] (rest ast)]
+                (assert (= :expr (first value)))
+                (emit-assign name (first (emit value))))
+      :call (let [[name args kwargs] (rest ast)]
+              (emit-call name
+                (map (fn [arg]
+                       (assert (= :expr (first arg)))
+                       (first (emit arg)))
+                     args)
+                (into {}
+                  (map (fn [[k v]]
+                         (assert (= :expr (first v)))
+                         [k (first (emit v))]))
+                    kwargs)))
+      ; Either a string literal or a call expression
+      :expr (let [expr (second ast)]
+              (cond
+                (string? expr) [expr]
+                (= :call (first expr)) (emit expr)
+                :else (throw (ex-info "Invalid expression" {:expr expr}))))
+      ; A list of statements. Can't be empty.
+      :block (let [statements (rest ast)]
+               (assert (seq statements))
+               (mapcat emit statements))
+      :if (let [[condition then elifs else] (rest ast)]
+            (assert (= :expr (first condition)))
+            (assert (= :block (first then)))
+            (emit-if (first (emit condition))
+              (emit then)
+              (map (fn [[condition body]]
+                     (assert (= :expr (first condition)))
+                     (assert (= :block (first body)))
+                     [(first (emit condition)) (emit body)])
+                   elifs)
+              (when (some? else)
+                (assert (= :block (first else)))
+                (emit else))))
+      :while (let [[condition body] (rest ast)]
+               (assert (= :expr (first condition)))
+               (assert (= :block (first body)))
+               (emit-while (first (emit condition)) (emit body)))
+      :break (emit-break)
+      :continue (emit-continue)
+      :def (let [[name params body] (rest ast)]
+             (assert (= :block (first body)))
+             (emit-def name params (emit body)))
+      :return (let [value (second ast)]
+                (assert (= :expr (first value)))
+                (emit-return (first (emit value))))
+      :try (let [[body excepts finally] (rest ast)]
+             (assert (= :block (first body)))
+             (emit-try (emit body)
+               (map (fn [[exception binding body]]
+                      (assert (= :block (first body)))
+                      [exception binding (emit body)])
+                    excepts)
+               (when (some? finally)
+                 (emit finally)))))))

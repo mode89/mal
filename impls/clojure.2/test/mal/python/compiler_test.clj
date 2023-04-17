@@ -2,12 +2,6 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.python.compiler :as c]))
 
-(deftest indent
-  (is (= (c/indent "a" "b") "ba"))
-  (is (= (c/indent "a\nb" "c") "ca\ncb"))
-  (is (= (c/indent "a\nb\n" "c") "ca\ncb"))
-  (is (= (c/indent "hello\nworld" "  ") "  hello\n  world")))
-
 (deftest emit-assign
   (is (= (c/emit-assign "a" "b") ["a = b"])))
 
@@ -117,3 +111,139 @@
           "  f"
           "finally:"
           "  g"])))
+
+(deftest emit
+  (is (= (c/emit [:assign "a" [:expr "b"]]) ["a = b"]))
+  (is (= (c/emit [:call "foo" [[:expr "a"] [:expr "b"]]
+                              {"c" [:expr "42"]}])
+         ["foo(a, b, c=42)"]))
+  (is (= (c/emit [:block
+                   [:assign "a" [:expr "b"]]
+                   [:call "foo" [[:expr "a"] [:expr "b"]]
+                                {"c" [:expr "42"]}]])
+         ["a = b"
+          "foo(a, b, c=42)"]))
+  (is (= (c/emit [:block
+                   [:block
+                     [:assign "a" [:expr "b"]]
+                     [:assign "c" [:expr "d"]]]
+                   [:block
+                     [:assign "e" [:expr "f"]]
+                     [:assign "g" [:expr "h"]]]])
+         ["a = b"
+          "c = d"
+          "e = f"
+          "g = h"]))
+  (is (= (c/emit [:if [:expr "a"]
+                   [:block
+                     [:assign "b" [:expr "c"]]] nil nil])
+         ["if a:" "  b = c"]))
+  (is (= (c/emit [:if [:expr "a"]
+                   [:block
+                     [:assign "b" [:expr "c"]]]
+                   nil
+                   [:block
+                     [:assign "d" [:expr "e"]]]])
+         ["if a:"
+          "  b = c"
+          "else:"
+          "  d = e"]))
+  (is (= (c/emit [:if [:expr "cond1"]
+                   [:block
+                     [:assign "a" [:expr "b"]]
+                     [:call "foo" [[:expr "a"] [:expr "b"]] {}]]
+                   [[[:expr "cond2"]
+                       [:block
+                         [:assign "f" [:expr "g"]]
+                         [:assign "h" [:expr "i"]]]]
+                    [[:expr "cond3"]
+                       [:block
+                         [:call "baz" [[:expr "j"] [:expr "k"]] {}]
+                         [:assign "l" [:expr "m"]]]]]
+                   [:block
+                     [:call "bar" [[:expr "x"] [:expr "y"]]
+                                  {"z" [:expr "42"]}]
+                     [:assign "p" [:expr "q"]]]])
+         ["if cond1:"
+          "  a = b"
+          "  foo(a, b)"
+          "elif cond2:"
+          "  f = g"
+          "  h = i"
+          "elif cond3:"
+          "  baz(j, k)"
+          "  l = m"
+          "else:"
+          "  bar(x, y, z=42)"
+          "  p = q"]))
+  (is (= (c/emit [:while [:expr "a"]
+                   [:block
+                     [:assign "b" [:expr "c"]]]])
+         ["while a:" "  b = c"]))
+  (is (= (c/emit [:while [:expr "a"]
+                   [:block
+                     [:assign "b" [:expr "c"]]
+                     [:if [:expr [:call "foo"
+                                   [[:expr "a"] [:expr "b"]]
+                                   {"c" [:expr "42"]}]]
+                       [:block
+                         [:break]]
+                       nil
+                       [:block
+                         [:continue]]]]])
+         ["while a:"
+          "  b = c"
+          "  if foo(a, b, c=42):"
+          "    break"
+          "  else:"
+          "    continue"]))
+  (is (= (c/emit [:def "foo" ["a" "b"]
+                   [:block
+                     [:assign "c" [:expr "d"]]
+                     [:return [:expr "e"]]]])
+         ["def foo(a, b):"
+          "  c = d"
+          "  return e"]))
+  (is (= (c/emit [:try
+                   [:block
+                     [:assign "a" [:expr "b"]]]
+                   nil
+                   [:block
+                     [:assign "c" [:expr "d"]]]])
+         ["try:"
+          "  a = b"
+          "finally:"
+          "  c = d"]))
+  (is (= (c/emit [:try
+                   [:block
+                     [:assign "a" [:expr "b"]]
+                     [:call "foo" [[:expr "a"] [:expr "b"]]
+                                  {"c" [:expr "42"]}]]
+                   [["Exception" nil
+                      [:block
+                        [:assign "d" [:expr "e"]]
+                        [:return [:expr "f"]]]]
+                    ["ValueError" "e"
+                      [:block
+                        [:assign "g" [:expr "h"]]
+                        [:return [:expr "i"]]]]
+                    ["TypeError" "e"
+                      [:block
+                        [:assign "j" [:expr "k"]]]]]
+                   [:block
+                     [:assign "l" [:expr "m"]]
+                     [:return [:expr "n"]]]])
+         ["try:"
+          "  a = b"
+          "  foo(a, b, c=42)"
+          "except Exception:"
+          "  d = e"
+          "  return f"
+          "except ValueError as e:"
+          "  g = h"
+          "  return i"
+          "except TypeError as e:"
+          "  j = k"
+          "finally:"
+          "  l = m"
+          "  return n"])))
