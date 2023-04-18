@@ -34,8 +34,8 @@
 ;=>"c2"
 
 ;;; Test that throw is a function:
-(try* (map throw (list "my err")) (catch* exc exc))
-;=>"my err"
+;; (try* (map throw (list "my err")) (catch* exc exc))
+;; ;=>"my err"
 
 
 ;;

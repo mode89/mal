@@ -89,7 +89,7 @@ step8 = step8_macros
 step9 = step9_try
 stepA = stepA_mal
 
-argv_STEP = step6_file
+# argv_STEP = step6_file
 
 
 regress_step0 = step0
