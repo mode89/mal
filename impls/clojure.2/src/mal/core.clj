@@ -11,6 +11,7 @@
   (:import [mal.types Atom Function Keyword Symbol]))
 
 (declare apply)
+(declare cons)
 (declare eval)
 (declare first)
 (declare map)
@@ -53,7 +54,8 @@
   (instance? Atom x))
 
 (defn list? [x]
-  (clj/list? x))
+  (or (clj/list? x)
+      (clj/seq? x)))
 
 (defn vector? [x]
   (instance? clojure.lang.PersistentVector x))
@@ -164,11 +166,10 @@
     (symbol? ast)
       (env-get env ast)
     (list? ast)
-      (apply list
-        (map
-          (fn [x]
-            (eval x env))
-          ast))
+      (map
+        (fn [x]
+          (eval x env))
+        ast)
     (vector? ast)
       (clj/vec (map (fn [x] (eval x env)) ast))
     (map? ast)
@@ -194,7 +195,7 @@
             (assert (= (count params) 2))
             (assoc template rest-arg
                    (fn [args]
-                     (apply list (drop param-index args)))))
+                     (drop param-index args))))
           (recur (rest params)
                  (inc param-index)
                  (assoc template param
@@ -241,7 +242,7 @@
         (list (symbol "quote") ast)
       (vector? ast)
         (list (symbol "vec")
-          (quasiquote (clj/apply list ast)))
+          (quasiquote (seq ast)))
       :else
         ast)))
 
@@ -405,38 +406,20 @@
   (assert (atom? a))
   (clj/swap! (:value a)
     (fn [x]
-      (eval (clj/apply list f x args)
+      (eval (cons f (cons x args))
             (env-make nil {})))))
 
 (defn cons [x xs]
-  (cond
-    (list? xs) (clj/conj xs x)
-    (vector? xs) (apply list (clj/cons x xs))
-    :else (throw (ex-info "Can't cons to this" {:object xs}))))
+  (clj/cons x xs))
 
 (defn concat [& args]
-  (if (empty? args)
-    (list)
-    (let [lists (reverse args)
-          init-list (first lists)]
-      (reduce
-        (fn [acc l]
-          (loop [l (reverse l)
-                 result acc]
-            (if (empty? l)
-              result
-              (recur (rest l) (cons (first l) result)))))
-        (cond
-          (list? init-list)
-            init-list
-          (vector? init-list)
-            (clj/apply list init-list))
-        (rest lists)))))
+  (clj/apply clj/concat args))
 
 (defn vec [l]
   (cond
     (list? l) (clj/vec l)
     (vector? l) l
+    (nil? l) []
     :else (throw (ex-info "Can't convert to vector" {:object l}))))
 
 (defn nth [coll i]
@@ -449,22 +432,10 @@
                           {:object coll :type (type coll)}))))
 
 (defn first [coll]
-  (cond
-    (list? coll) (clj/first coll)
-    (vector? coll) (clj/first coll)
-    (nil? coll) nil
-    (seq? coll) (clj/first coll)
-    :else (throw (ex-info "`first` not supported on this type"
-                          {:object coll :type (type coll)}))))
+  (clj/first coll))
 
 (defn rest [coll]
-  (cond
-    (list? coll) (clj/rest coll)
-    (vector? coll) (clj/apply list (clj/rest coll))
-    (nil? coll) (list)
-    (seq? coll) (clj/rest coll)
-    :else (throw (ex-info "`rest` not supported on this type"
-                          {:object coll :type (type coll)}))))
+  (clj/rest coll))
 
 (defn apply [f & args]
   (assert (> (count args) 0))
@@ -487,21 +458,22 @@
       (throw (ex-info "Can't call this" {:object f}))))
 
 (defn map [f coll]
-  (reduce
-    (fn [acc x]
-      (conj acc (apply f [x])))
-    (list)
-    (reverse coll)))
+  (clj/map
+    (if (clj/fn? f)
+      f
+      (fn [x]
+        (apply f (list x))))
+    coll))
 
 (defn keys [m]
-  (if-some [ks (clj/keys m)]
-    (apply list ks)
-    (list)))
+  (if (empty? m)
+    (list)
+    (clj/keys m)))
 
 (defn vals [m]
-  (if-some [vs (clj/vals m)]
-    (apply list vs)
-    (list)))
+  (if (empty? m)
+    (list)
+    (clj/vals m)))
 
 (defn throw [obj]
   (if (instance? Throwable obj)
