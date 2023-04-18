@@ -269,6 +269,11 @@
     (core/swap! a + 1 2 3)
     (is (= (core/deref a) 49)))
   (let [a (core/atom 42)
+        foo (core/eval (core/read-string "(fn* [x] (+ x 1))")
+                       basic-env)]
+    (core/swap! a foo)
+    (is (= (core/deref a) 43)))
+  (let [a (core/atom 42)
         foo (core/eval (core/read-string "(fn* [a b c] (+ a b c))")
                        basic-env)]
     (core/swap! a foo 1 2)

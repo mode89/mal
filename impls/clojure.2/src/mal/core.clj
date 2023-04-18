@@ -360,7 +360,7 @@
                           make-env (:make-env f)]
                       (recur body (make-env args)))
                   (clj/fn? f)
-                    (apply f args)
+                    (clj/apply f args)
                   :else
                     (throw (ex-info "Can't call this" {:object f})))))))))
     (eval-form form0 env)))
@@ -406,8 +406,7 @@
   (assert (atom? a))
   (clj/swap! (:value a)
     (fn [x]
-      (eval (cons f (cons x args))
-            (env-make nil {})))))
+      (apply f x args))))
 
 (defn cons [x xs]
   (clj/cons x xs))
@@ -446,7 +445,7 @@
         (eval body
           (make-env (let [rev-args (reverse args)
                           last-arg (first rev-args)]
-                      (assert (sequential? last-arg))
+                      (assert (seqable? last-arg))
                       (reduce
                         (fn [acc x]
                           (cons x acc))
