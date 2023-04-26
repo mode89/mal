@@ -15,7 +15,7 @@
       (clojure.core/fn? x)))
 
 (defn symbol [name]
-  (assert (string? name))
+  (assert (string? name) (str "Symbol name must be a string. Got: " name))
   (let [separator (index-of name \/)]
     (if (and (some? separator)
              (> (count name) 1))
