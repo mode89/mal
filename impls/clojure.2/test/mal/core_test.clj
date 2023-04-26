@@ -628,12 +628,12 @@
               :current-ns "user")]
     (is (identical?
           (-> ctx core/deref :ns-registry core/deref (get (sym$ "user")))
-          (core/eval ctx [] (list (sym$ "in-ns") (sym$ "user"))))))
+          (core/eval ctx [] (list (sym$ "in-ns") (quote$ (sym$ "user")))))))
   (let [ctx (mock-eval-context
               :ns-registry {"foo" nil}
               :current-ns "foo")
         foo (-> ctx core/deref :current-ns)
-        bar (core/eval ctx [] (list (sym$ "in-ns") (sym$ "bar")))]
+        bar (core/eval ctx [] (list (sym$ "in-ns") (quote$ (sym$ "bar"))))]
     (is (instance? Namespace bar))
     (is (= (sym$ "bar") (:name bar)))
     (is (identical?

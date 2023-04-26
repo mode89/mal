@@ -410,7 +410,7 @@
                     (do (assert (= (count args) 1))
                         (recur ctx locals try-expr))))
               (symbol "in-ns")
-                (let [ns-name (first args)]
+                (let [ns-name (eval ctx locals (first args))]
                   (assert (= (count args) 1))
                   (let [ns (ns-find-or-create ctx ns-name)]
                     (swap! ctx assoc :current-ns ns)
