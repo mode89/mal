@@ -1,9 +1,9 @@
 (ns mal.lexer
   (:refer-clojure :exclude [atom comment keyword newline symbol])
   (:require [mal.parsing :as pa]
-            [mal.types])
+            [mal.types :as types])
   (:import [mal.parsing Value]
-           [mal.types Keyword Symbol]))
+           [mal.types Keyword]))
 
 (defrecord Token [value line column])
 (defrecord Comment [text])
@@ -153,7 +153,7 @@
         (= \: id0)
           (pa/return (new Keyword (apply str (rest id))))
         :else
-          (pa/return (new Symbol id))))))
+          (pa/return (types/symbol id))))))
 
 (def token-types
   [special-character

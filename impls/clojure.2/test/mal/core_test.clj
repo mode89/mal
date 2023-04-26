@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.test.utils :refer [is-list? is-vector?]])
-  (:import [mal.types Function Keyword]))
+  (:import [mal.types EvalContext Function Keyword Namespace]))
 
 (defn sym$ [name]
   (assert (string? name))
@@ -65,167 +65,231 @@
 (defn throw$ [obj]
   (list (sym$ "throw*") obj))
 
-(def basic-env
-  (core/env-make nil
-    {(core/symbol "+") +
-     (core/symbol "-") -
-     (core/symbol "*") *
-     (core/symbol "=") =
-     (core/symbol "list") list
-     (core/symbol "cons") core/cons
-     (core/symbol "concat") core/concat
-     (core/symbol "vec") core/vec}))
+(def common-bindings
+  {(core/symbol "+") +
+   (core/symbol "-") -
+   (core/symbol "*") *
+   (core/symbol "=") =
+   (core/symbol "list") list
+   (core/symbol "cons") core/cons
+   (core/symbol "concat") core/concat
+   (core/symbol "vec") core/vec})
+
+(defn sample-namespace [ns]
+  (-> ns :bindings core/deref))
+
+(defn sample-eval-context [ctx]
+  {:ns-registry (->> ctx
+                     core/deref
+                     :ns-registry
+                     core/deref
+                     (map (fn [[ns-name ns]]
+                            [(:name ns-name) (sample-namespace ns)]))
+                     (into {}))
+   :current-ns (-> ctx core/deref :current-ns :name :name)})
+
+(defn mock-ns [name bindings]
+  (Namespace. (core/symbol name) (core/atom bindings)))
+
+(defn mock-eval-context [& {:keys [ns-registry current-ns]}]
+  (let [registry (into {}
+                   (map (fn [[name bindings]]
+                          [(core/symbol name) (mock-ns name bindings)])
+                        ns-registry))]
+    (core/atom
+      (EvalContext.
+        (core/atom registry)
+        (when (some? current-ns)
+          (get registry (core/symbol current-ns)))))))
 
 (deftest core-eval
-  (is (= (core/eval 42 (core/env-make nil {})) 42))
-  (is (= (core/eval '() (core/env-make nil {})) '()))
-  (is (= (core/eval (sym$ "a")
-                    (core/env-make nil {(sym$ "a") 42}))
-         42))
-  (try (core/eval (sym$ "a") (core/env-make nil {}))
+  (is (= (core/eval (mock-eval-context) nil 42) 42))
+  (is (= (core/eval (mock-eval-context) nil '()) '()))
+  (is (= (core/eval (mock-eval-context) [{(sym$ "a") 42}] (sym$ "a")) 42))
+  (try (core/eval (mock-eval-context) [] (sym$ "a"))
     (catch Throwable ex
       (is (core/object-exception? ex))
       (is (= (core/object-exception-unwrap ex) "'a' not found"))))
-  (is (= (core/eval [1 "2" (sym$ "c")]
-                    (core/env-make nil {(sym$ "c") [3 4 5]}))
-         [1 "2" [3 4 5]]))
-  (is (= (core/eval {1 "2" 3 (sym$ "c")}
-                    (core/env-make nil {(sym$ "c") [4 5 6]}))
-         {1 "2" 3 [4 5 6]}))
-  (is (= (core/eval (list (sym$ "foo") 7 (sym$ "bar"))
-           (core/env-make nil
-             {(sym$ "foo") (fn [x y] (+ x y))
-              (sym$ "bar") 42}))
-         49)))
+  (is (= [1 "2" [3 4 5]]
+         (core/eval (mock-eval-context) [{(sym$ "c") [3 4 5]}]
+           [1 "2" (sym$ "c")])))
+  (is (= {1 "2" 3 [4 5 6]}
+         (core/eval (mock-eval-context) [{(sym$ "c") [4 5 6]}]
+           {1 "2" 3 (sym$ "c")})))
+  (is (= 49 (core/eval (mock-eval-context)
+                       [{(sym$ "foo") (fn [x y] (+ x y))
+                         (sym$ "bar") 42}]
+              (list (sym$ "foo") 7 (sym$ "bar"))))))
 
-(deftest env-make
-  (is (= (deref (core/env-make nil {})) {:outer nil :table {}}))
-  (is (= (deref (core/env-make nil {(core/symbol "a") 1
-                                    (core/symbol "b") 2}))
-         {:outer nil :table {(core/symbol "a") 1
-                             (core/symbol "b") 2}}))
-  (let [outer-env (core/env-make nil {(core/symbol "a") 1
-                                      (core/symbol "b") 2})
-        env (core/env-make outer-env {(core/symbol "c") 3
-                                      (core/symbol "d") 4})]
-    (is (= (deref env) {:outer outer-env
-                        :table {(core/symbol "c") 3
-                                (core/symbol "d") 4}}))
-    (is (= (deref outer-env) {:outer nil
-                              :table {(core/symbol "a") 1
-                                      (core/symbol "b") 2}}))))
-
-(deftest env-set!
-  (let [env (core/env-make nil {})]
-    (core/env-set! env (core/symbol "a") 1)
-    (is (= (deref env) {:outer nil :table {(core/symbol "a") 1}})))
-  (let [env (core/env-make nil {(core/symbol "a") 1})]
-    (core/env-set! env (core/symbol "a") 2)
-    (is (= (deref env) {:outer nil :table {(core/symbol "a") 2}})))
-  (let [env (core/env-make nil {(core/symbol "a") 1})]
-    (core/env-set! env (core/symbol "b") 2)
-    (is (= (deref env) {:outer nil
-                        :table {(core/symbol "a") 1
-                                (core/symbol "b") 2}})))
-  (let [outer-env (core/env-make nil {(core/symbol "a") 1})
-        env (core/env-make outer-env {(core/symbol "b") 2})]
-    (core/env-set! env (core/symbol "a") 3)
-    (is (= (deref env) {:outer outer-env
-                        :table {(core/symbol "b") 2
-                                (core/symbol "a") 3}}))
-    (is (= (deref outer-env) {:outer nil :table {(core/symbol "a") 1}}))))
-
-(deftest env-get
-  (let [env (core/env-make nil {(core/symbol "a") 1})]
-    (is (= (core/env-get env (core/symbol "a")) 1))
-    (try (core/env-get env (core/symbol "b"))
-      (catch Throwable ex
-        (is (core/object-exception? ex))
-        (is (= (core/object-exception-unwrap ex) "'b' not found")))))
-  (let [outer-env (core/env-make nil {(core/symbol "a") 1})
-        env (core/env-make outer-env {(core/symbol "b") 2})]
-    (is (= (core/env-get env (core/symbol "a")) 1))))
+(deftest resolve-symbol
+  (is (= 42 (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}]
+              (sym$ "a"))))
+  (is (= 9001 (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}
+                                                        {(sym$ "b") 9001}]
+                (sym$ "b"))))
+  (try
+    (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}
+                                              {(sym$ "b") 9001}]
+      (sym$ "c"))
+    (catch Throwable ex
+      (is (core/object-exception? ex))
+      (is (= (core/object-exception-unwrap ex) "'c' not found"))))
+  (is (= 1234 (core/resolve-symbol
+                (mock-eval-context
+                  :ns-registry {"foo" {(sym$ "c") 1234}}
+                  :current-ns "foo")
+                [{(sym$ "a") 42}
+                 {(sym$ "b") 9001}]
+                (sym$ "c"))))
+  (try
+    (core/resolve-symbol
+      (mock-eval-context
+        :ns-registry {"foo" {(sym$ "c") 1234}}
+        :current-ns "foo")
+      [{(sym$ "a") 42}
+       {(sym$ "b") 9001}]
+      (sym$ "d"))
+    (catch Throwable ex
+      (is (core/object-exception? ex))
+      (is (= (core/object-exception-unwrap ex) "'d' not found")))))
 
 (deftest eval-def
-  (let [env (core/env-make nil {})]
-    (is (= (core/eval (def$ "a" 42) env) 42))
-    (is (= (deref env) {:outer nil :table {(sym$ "a") 42}})))
-  (let [env (core/env-make basic-env {})]
-    (is (= (core/eval (def$ "a" (list (sym$ "+") 1 2)) env) 3))
-    (is (= (deref env) {:outer basic-env :table {(sym$ "a") 3}})))
-  (let [env (core/env-make basic-env {})]
-    (is (= (core/eval (def$ "a" (list (sym$ "list") 1 2)) env)
-           (list 1 2)))
-    (is (= (deref env) {:outer basic-env :table {(sym$ "a") (list 1 2)}}))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= 42 (core/eval ctx [] (def$ "a" 42))))
+    (is (= {:ns-registry {"user" {(sym$ "a") 42}}
+            :current-ns "user"}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= 3 (core/eval ctx [common-bindings]
+               (def$ "a" (list (sym$ "+") 1 2)))))
+    (is (= {:ns-registry {"user" {(sym$ "a") 3}}
+            :current-ns "user"}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= (list 1 2) (core/eval ctx [common-bindings]
+                        (def$ "a" (list (sym$ "list") 1 2)))))
+    (is (= {:ns-registry {"user" {(sym$ "a") (list 1 2)}}
+            :current-ns "user"}
+           (sample-eval-context ctx)))))
 
 (deftest eval-let
-  (is (= (core/eval (let$ '() 42) (core/env-make nil {})) 42))
-  (let [env (core/env-make nil {})]
-    (is (= (core/eval (let$ (list (sym$ "a") 42)
-                        (sym$ "a"))
-                      env)
-           42))
-    (is (= (deref env) {:outer nil :table {}})))
-  (let [env (core/env-make basic-env {})]
-    (is (= (core/eval (let$ (list (sym$ "a") 1
-                                  (sym$ "b") 2)
-                        (list (sym$ "+") (sym$ "a") (sym$ "b")))
-                      env)
-           3))
-    (is (= (deref env) {:outer basic-env :table {}})))
-  (let [env (core/env-make basic-env {})]
-    (is (= (core/eval (let$ (list (sym$ "a") 1
-                                  (sym$ "b") (list (sym$ "+") (sym$ "a") 1)
-                                  (sym$ "c") (list (sym$ "+")
-                                                   (sym$ "a")
-                                                   (sym$ "b")))
-                        (sym$ "c"))
-                      env)
-           3))))
+  (let [ctx (mock-eval-context)]
+    (is (= (core/eval ctx [] (let$ '() 42)) 42))
+    (is (= {:ns-registry {} :current-ns nil}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context)]
+    (is (= 42 (core/eval ctx []
+                (let$ (list (sym$ "a") 42)
+                  (sym$ "a")))))
+    (is (= {:ns-registry {} :current-ns nil}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context)]
+    (is (= 3 (core/eval ctx [common-bindings]
+               (let$ (list (sym$ "a") 1
+                           (sym$ "b") 2)
+                 (list (sym$ "+") (sym$ "a") (sym$ "b"))))))
+    (is (= {:ns-registry {} :current-ns nil}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context)]
+    (is (= 3 (core/eval ctx [common-bindings]
+               (let$ (list (sym$ "a") 1
+                           (sym$ "b") (list (sym$ "+") (sym$ "a") 1)
+                           (sym$ "c") (list (sym$ "+")
+                                            (sym$ "a")
+                                            (sym$ "b")))
+                 (sym$ "c")))))
+    (is (= {:ns-registry {} :current-ns nil}
+           (sample-eval-context ctx)))))
 
 (deftest eval-do
-  (is (= (core/eval (do$) (core/env-make nil {})) nil))
-  (is (= (core/eval (do$ 42) (core/env-make nil {})) 42))
-  (is (= (core/eval (do$ 42 7 9001) (core/env-make nil {})) 9001))
-  (let [env (core/env-make nil {})]
-    (is (= (core/eval (do$ (def$ "a" 42) (sym$ "a")) env) 42))
-    (is (= (deref env) {:outer nil :table {(sym$ "a") 42}}))))
+  (let [ctx (mock-eval-context)]
+    (is (= nil (core/eval ctx [] (do$))))
+    (is (= 42 (core/eval ctx [] (do$ 42))))
+    (is (= 9001 (core/eval ctx [] (do$ 42 7 9001))))
+    (is (= {:ns-registry {} :current-ns nil}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= 42 (core/eval ctx []
+                (do$ (def$ "a" 42)
+                     (sym$ "a")))))
+    (is (= {:ns-registry {"user" {(sym$ "a") 42}}
+            :current-ns "user"}
+           (sample-eval-context ctx)))))
 
 (deftest eval-if
-  (is (= (core/eval (if$ true 1 2) (core/env-make nil {})) 1))
-  (is (= (core/eval (if$ false 1 2) (core/env-make nil {})) 2))
-  (is (= (core/eval (if$ true 1) (core/env-make nil {})) 1))
-  (is (= (core/eval (if$ false 1) (core/env-make nil {})) nil))
-  (let [env (core/env-make nil {})]
-    (is (= (core/eval (if$ true (def$ "a" 1) (def$ "b" 2)) env) 1))
-    (is (= (deref env) {:outer nil :table {(sym$ "a") 1}})))
-  (let [env (core/env-make nil {})]
-    (is (= (core/eval (if$ false (def$ "a" 1) (def$ "b" 2)) env) 2))
-    (is (= (deref env) {:outer nil :table {(sym$ "b") 2}}))))
+  (let [ctx (mock-eval-context)]
+    (is (= 1 (core/eval ctx [] (if$ true 1 2))))
+    (is (= 2 (core/eval ctx [] (if$ false 1 2))))
+    (is (= 1 (core/eval ctx [] (if$ true 1))))
+    (is (= nil (core/eval ctx [] (if$ false 1)))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= 1 (core/eval ctx []
+               (if$ true
+                 (def$ "a" 1)
+                 (def$ "b" 2)))))
+    (is (= {:ns-registry {"user" {(sym$ "a") 1}}
+            :current-ns "user"}
+           (sample-eval-context ctx))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= 2 (core/eval ctx []
+               (if$ false
+                 (def$ "a" 1)
+                 (def$ "b" 2)))))
+    (is (= {:ns-registry {"user" {(sym$ "b") 2}}
+            :current-ns "user"}
+           (sample-eval-context ctx)))))
 
 (deftest eval-fn
-  (is (instance? Function (core/eval (fn$ '() 42) (core/env-make nil {}))))
-  (is (= (core/eval (list (fn$ '() 42)) (core/env-make nil {})) 42))
-  (is (= (core/eval (list (fn$ (list (sym$ "x"))
-                               (sym$ "x"))
-                          42)
-                    (core/env-make nil {}))
-         42))
-  (let [env (core/env-make nil {(sym$ "x") 42})]
-    (is (= (core/eval (list (fn$ (list (sym$ "x"))) 42) env) nil))
-    (is (= (deref env) {:outer nil :table {(sym$ "x") 42}})))
-  (let [env (core/env-make nil {(sym$ "x") 42})]
-    (is (= (core/eval (list (fn$ (list (sym$ "x")) (sym$ "x")) 43) env) 43))
-    (is (= (deref env) {:outer nil :table {(sym$ "x") 42}})))
-  (is (= (core/eval (list (fn$ (list (sym$ "x") (sym$ "y"))
-                            (list (sym$ "+") (sym$ "x") (sym$ "y")))
-                          1 2)
-                    (core/env-make basic-env {}))
-         3))
-  (is (= (core/eval (list (fn$ (list (sym$ "&") (sym$ "xs")) (sym$ "xs"))
-                          1 2 3 4 5)
-                    (core/env-make nil {}))
-         [1 2 3 4 5])))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (instance? Function (core/eval ctx [] (fn$ '() 41))))
+    (is (= 42 (core/eval ctx [] (list (fn$ '() 42)))))
+    (is (= 43 (core/eval ctx []
+                (list (fn$ (list (sym$ "x")) (sym$ "x")) 43))))
+    (is (= nil (core/eval ctx [{(sym$ "x") 42}]
+                 (list (fn$ (list (sym$ "x"))) 43))))
+    (is (= 43 (core/eval ctx [{(sym$ "x") 42}]
+                (list (fn$ (list (sym$ "x")) (sym$ "x")) 43))))
+    (is (= 3 (core/eval ctx [common-bindings]
+               (list (fn$ (list (sym$ "x") (sym$ "y"))
+                          (list (sym$ "+") (sym$ "x") (sym$ "y")))
+                     1 2))))
+    (is (= [1 2 3 4 5]
+           (core/eval ctx []
+             (list (fn$ (list (sym$ "&") (sym$ "xs")) (sym$ "xs"))
+                   1 2 3 4 5)))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" {(sym$ "+") +}}
+              :current-ns "user")]
+    (is (= 3 (core/eval ctx []
+               (list (fn$ (list (sym$ "x") (sym$ "y"))
+                          (list (sym$ "+") (sym$ "x") (sym$ "y")))
+                     1 2)))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (= {:macro? false
+            :params (list (sym$ "a") (sym$ "b") (sym$ "c"))
+            :body (list (sym$ "+") (sym$ "a") (sym$ "b") (sym$ "c"))
+            :context (core/deref ctx)}
+           (select-keys
+             (core/eval ctx []
+               (fn$ (list (sym$ "a") (sym$ "b") (sym$ "c"))
+                 (list (sym$ "+") (sym$ "a") (sym$ "b") (sym$ "c"))))
+             [:macro? :params :body :context])))))
 
 (deftest core-pr-str
   (is (= (core/pr-str) ""))
@@ -240,20 +304,23 @@
   (is (= (core/str "a\"b") "a\"b")))
 
 (deftest eval-tail-call-optimization
-  (let [env (core/env-make basic-env {})]
-    (core/eval
-      (def$ "foo" (fn$ (list (sym$ "n"))
-                    (if$ (list (sym$ "=") (sym$ "n") 0)
-                      0
-                      (list (sym$ "bar") (list (sym$ "-") (sym$ "n") 1)))))
-      env)
-    (core/eval
-      (def$ "bar" (fn$ (list (sym$ "n"))
-                    (if$ (list (sym$ "=") (sym$ "n") 0)
-                      0
-                      (list (sym$ "foo") (list (sym$ "-") (sym$ "n") 1)))))
-      env)
-    (is (= (core/eval (list (sym$ "foo") 10000) env) 0))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (core/eval ctx [common-bindings]
+      (def$ "foo"
+        (fn$ (list (sym$ "n"))
+          (if$ (list (sym$ "=") (sym$ "n") 0)
+            0
+            (list (sym$ "bar") (list (sym$ "-") (sym$ "n") 1))))))
+    (core/eval ctx [common-bindings]
+      (def$ "bar"
+        (fn$ (list (sym$ "n"))
+          (if$ (list (sym$ "=") (sym$ "n") 0)
+            0
+            (list (sym$ "foo") (list (sym$ "-") (sym$ "n") 1))))))
+    (is (= 0 (core/eval ctx [common-bindings]
+               (list (sym$ "foo") 10000))))))
 
 (deftest core-read-string
   (is (= (core/read-string "(foo [1 \"2\"] {abc :def})")
@@ -267,17 +334,7 @@
     (core/reset! a 43)
     (is (= (core/deref a) 43))
     (core/swap! a + 1 2 3)
-    (is (= (core/deref a) 49)))
-  (let [a (core/atom 42)
-        foo (core/eval (core/read-string "(fn* [x] (+ x 1))")
-                       basic-env)]
-    (core/swap! a foo)
-    (is (= (core/deref a) 43)))
-  (let [a (core/atom 42)
-        foo (core/eval (core/read-string "(fn* [a b c] (+ a b c))")
-                       basic-env)]
-    (core/swap! a foo 1 2)
-    (is (= (core/deref a) 45))))
+    (is (= (core/deref a) 49))))
 
 (deftest core-cons
   (is-list? (core/cons 1 (list 2 3)) (list 1 2 3))
@@ -302,33 +359,24 @@
   (is (not (core/list? []))))
 
 (deftest eval-quote
-  (is (= (core/eval
-           (list (core/symbol "quote") 42)
-           (core/env-make nil {}))
-         42))
-  (is (= (core/eval
-           (list (core/symbol "quote") (list 1 2 3))
-           (core/env-make nil {}))
-         (list 1 2 3)))
-  (is (= (core/eval
-           (list (core/symbol "quote") (core/symbol "foo"))
-           (core/env-make nil {}))
-         (core/symbol "foo")))
-  (is (= (core/eval
-           (list (core/symbol "quote") (list (core/symbol "quote") 42))
-           (core/env-make nil {}))
-         (list (core/symbol "quote") 42)))
-  (is (= (core/eval
-           (list (core/symbol "quote") [1 2 3])
-           (core/env-make nil {}))
-         [1 2 3]))
-  (is (= (core/eval
+  (is (= 42 (core/eval (mock-eval-context) []
+              (list (core/symbol "quote") 42))))
+  (is (= (list 1 2 3) (core/eval (mock-eval-context) []
+                        (list (core/symbol "quote") (list 1 2 3)))))
+  (is (= (core/symbol "foo")
+         (core/eval (mock-eval-context) []
+           (list (core/symbol "quote") (core/symbol "foo")))))
+  (is (= (list (core/symbol "quote") 42)
+         (core/eval (mock-eval-context) []
+           (list (core/symbol "quote") (list (core/symbol "quote") 42)))))
+  (is (= [1 2 3] (core/eval (mock-eval-context) []
+                   (list (core/symbol "quote") [1 2 3]))))
+  (is (= {(core/keyword "a") 1
+          (core/keyword "b") 2}
+         (core/eval (mock-eval-context) []
            (list (core/symbol "quote")
                  {(core/keyword "a") 1
-                  (core/keyword "b") 2})
-           (core/env-make nil {}))
-         {(core/keyword "a") 1
-          (core/keyword "b") 2})))
+                  (core/keyword "b") 2})))))
 
 (deftest core-quasiquote
   (is (= (core/quasiquote 42) 42))
@@ -346,9 +394,13 @@
          (concat$ (sym$ "foo") (cons$ 42 '())))))
 
 (deftest eval-quasiquote
-  (let [env (core/env-make basic-env {(sym$ "x") 42
-                                      (sym$ "l") (list 1 2 3)})
-        eval-qq (fn [form] (core/eval (qq$ form) env))]
+  (let [eval-qq (fn [form]
+                  (core/eval
+                    (mock-eval-context)
+                    [{(sym$ "x") 42
+                      (sym$ "l") (list 1 2 3)}
+                     common-bindings]
+                    (qq$ form)))]
     (is (= (eval-qq 42) 42))
     (is (= (eval-qq (sym$ "x")) (sym$ "x")))
     (is (= (eval-qq (list)) (list)))
@@ -378,77 +430,94 @@
            (list 0 (sym$ "splice-unquote"))))))
 
 (deftest eval-defmacro
-  (let [env (core/env-make nil {})
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+        ns-bindings (-> ctx core/deref :current-ns :bindings)
         params (list (sym$ "x"))
         body (qq$ (list (list (sym$ "unquote") (sym$ "x"))
                         (list (sym$ "unquote") (sym$ "x"))))]
-    (core/eval
-      (defmacro$ "dup" (fn$ params body))
-      env)
-    (is (nil? (-> env deref :outer)))
-    (is (= (-> env deref :table count) 1))
-    (is (= (-> env
-               deref
-               :table
-               (get (sym$ "dup"))
-               (select-keys [:macro? :params :body]))
-           {:macro? true
+    (core/eval ctx []
+      (defmacro$ "dup" (fn$ params body)))
+    (is (= [(sym$ "dup")]
+           (-> ns-bindings core/deref keys)))
+    (is (= {:macro? true
             :params params
-            :body body}))))
+            :body body
+            :context (core/deref ctx)}
+           (-> ns-bindings
+               core/deref
+               (get (sym$ "dup"))
+               (select-keys [:macro? :params :body :context]))))))
 
 (deftest core-macroexpand
-  (is (= (core/macroexpand 42 (core/env-make nil {})) 42))
-  (is (= (core/macroexpand (list 1 2) (core/env-make nil {})) (list 1 2)))
-  (is (= (core/macroexpand
-           (list (sym$ "x") 42)
-           (core/env-make nil {}))
-         (list (sym$ "x") 42)))
-  (is (= (core/macroexpand
-           (list (sym$ "x") 1)
-           (core/env-make nil {(sym$ "x") 2}))
-         (list (sym$ "x") 1)))
-  (is (= (core/macroexpand
-           (list (sym$ "dup") (sym$ "x"))
-           (core/env-make nil
-              {(sym$ "dup")
-                 (core/make-fn* true (core/env-make basic-env {})
-                   (list (sym$ "arg"))
-                   (qq$ (list (unq$ (sym$ "arg"))
-                              (unq$ (sym$ "arg")))))}))
-         (list (sym$ "x") (sym$ "x")))))
+  (is (= 42 (core/macroexpand (mock-eval-context) [] 42)))
+  (is (= (list 1 2) (core/macroexpand (mock-eval-context) [] (list 1 2))))
+  (is (= (list (sym$ "x") 42)
+         (core/macroexpand (mock-eval-context) []
+           (list (sym$ "x") 42))))
+  (is (= (list (sym$ "x") 1)
+         (core/macroexpand (mock-eval-context) [{(sym$ "x") 2}]
+           (list (sym$ "x") 1))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (core/eval ctx [common-bindings]
+      (defmacro$ "dup"
+        (fn$ (list (sym$ "arg"))
+          (qq$ (list (unq$ (sym$ "arg"))
+            (unq$ (sym$ "arg")))))))
+    (is (= (list (sym$ "x") (sym$ "x"))
+           (core/macroexpand ctx []
+             (list (sym$ "dup") (sym$ "x")))))))
 
 (deftest eval-macro
-  (let [env (core/env-make basic-env {})]
-    (core/eval
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+        ns-bindings (-> ctx core/deref :current-ns :bindings)]
+    (core/eval ctx []
       (defmacro$ "unless"
         (fn$ (list (sym$ "pred") (sym$ "then") (sym$ "else"))
           (if$ (sym$ "pred")
             (qq$ (unq$ (sym$ "else")))
-            (qq$ (unq$ (sym$ "then"))))))
-      env)
-    (core/eval
+            (qq$ (unq$ (sym$ "then")))))))
+    (core/eval ctx []
       (list (sym$ "unless") false
         (def$ "a" 1)
-        (def$ "b" 2))
-      env)
-    (is (= (->> env deref :table keys (map :name) sort) ["a" "unless"]))
-    (is (= (-> env deref :table (get (sym$ "a"))) 1)))
-  (let [env (core/env-make basic-env {})]
-    (core/eval
-      (defmacro$ "just" (fn$ (list (sym$ "x"))
-                          (qq$ (unq$ (sym$ "x")))))
-      env)
-    (is (= (core/eval (list (sym$ "just") 42) env) 42)))
-  (let [env (core/env-make basic-env {})]
-    (core/eval
-      (defmacro$ "identity" (fn$ (list (sym$ "x"))
-                              (sym$ "x")))
-      env)
-    (is (= (core/eval
-             (let$ (list (sym$ "a") 123)
-               (list (sym$ "identity") (sym$ "a")))
-             env)
-           123))))
+        (def$ "b" 2)))
+    (is (= ["a" "unless"]
+           (->> ns-bindings core/deref keys (map :name) sort)))
+    (is (= 1 (-> ns-bindings core/deref (get (sym$ "a"))))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (core/eval ctx []
+      (defmacro$ "just"
+        (fn$ (list (sym$ "x"))
+          (qq$ (unq$ (sym$ "x"))))))
+    (is (= 42 (core/eval ctx [] (list (sym$ "just") 42)))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (core/eval ctx []
+      (defmacro$ "identity"
+        (fn$ (list (sym$ "x"))
+          (sym$ "x"))))
+    (is (= 123 (core/eval ctx []
+                 (let$ (list (sym$ "a") 123)
+                   (list (sym$ "identity") (sym$ "a")))))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" common-bindings}
+              :current-ns "user")]
+    (core/eval ctx []
+      (core/read-string
+        "(defmacro! unless
+           (fn* (pred a b)
+             `(if ~pred ~b ~a)))"))
+    (is (= 8 (core/eval ctx [] (list (sym$ "unless") true 7 8))))
+    (is (= 7 (core/eval ctx [] (list (sym$ "unless") false 7 8))))
+    ))
 
 (deftest core-nth
   (is (= (core/nth nil 0) nil))
@@ -488,57 +557,53 @@
     (catch Throwable ex
       (is (core/object-exception? ex))
       (is (= (core/object-exception-unwrap ex) 42))))
-  (is (= (core/eval (try$ 123 "e" 456) (core/env-make nil {})) 123))
-  (is (= (core/eval (try$ (sym$ "abc") "exc"
-                      (list (sym$ "str") "exc is: " (sym$ "exc")))
-                    (core/env-make nil {(sym$ "str") core/str}))
-         "exc is: 'abc' not found"))
-  (is (= (core/eval (try$
-                      (do$ (try$ "t1" "e" "c1")
+  (is (= 123 (core/eval (mock-eval-context) [] (try$ 123 "e" 456))))
+  (is (= "exc is: 'abc' not found"
+         (core/eval (mock-eval-context) [{(sym$ "str") core/str}]
+           (try$ (sym$ "abc")
+             "exc" (list (sym$ "str") "exc is: " (sym$ "exc"))))))
+  (is (= "c2" (core/eval (mock-eval-context) []
+                (try$ (do$ (try$ "t1" "e" "c1")
                            (throw$ "e2"))
-                      "e" "c2")
-                    (core/env-make nil {}))
-         "c2"))
-
-  (is (= (core/eval (try$
-                      (try$ (throw$ "e1") "e" (throw$ "e2"))
-                      "e" "c2")
-                    (core/env-make nil {}))
-         "c2"))
+                  "e" "c2"))))
+  (is (= "c2" (core/eval (mock-eval-context) []
+              (try$
+                (try$
+                  (throw$ "e1")
+                  "e" (throw$ "e2"))
+                "e" "c2"))))
   (try
-    (core/eval (try$ (sym$ "xyz")) (core/env-make nil {}))
+    (core/eval (mock-eval-context) []
+      (try$ (sym$ "xyz")))
     (catch Throwable ex
       (is (core/object-exception? ex))
       (is (= (core/object-exception-unwrap ex) "'xyz' not found")))))
 
 (deftest core-apply
-  (let [f (fn [a b c] (+ a (* b 2) (* c 3)))]
-    (is (= (core/apply f (list 1 2 3)) 14))
-    (is (= (core/apply f 2 (list 3 4)) 20))
-    (is (= (core/apply f 3 4 (list 5)) 26))
-    (is (= (core/apply f [1 2 3]) 14))
-    (is (= (core/apply f 2 [3 4]) 20))
-    (is (= (core/apply f 3 4 [5]) 26)))
-  (let [f (core/eval
-            (fn$ (list (sym$ "a") (sym$ "b") (sym$ "c"))
-              (list (sym$ "+") (sym$ "a")
-                               (list (sym$ "*") (sym$ "b") 2)
-                               (list (sym$ "*") (sym$ "c") 3)))
-            basic-env)]
-    (is (= (core/apply f (list 1 2 3)) 14))
-    (is (= (core/apply f 2 (list 3 4)) 20))
-    (is (= (core/apply f 3 4 (list 5)) 26))
-    (is (= (core/apply f [1 2 3]) 14))
-    (is (= (core/apply f 2 [3 4]) 20))
-    (is (= (core/apply f 3 4 [5]) 26))))
+  (let [f (fn [a b c]
+            (+ a (* b 2) (* c 3)))]
+    (is (= 14 (core/apply f (list 1 2 3))))
+    (is (= 20 (core/apply f 2 (list 3 4))))
+    (is (= 26 (core/apply f 3 4 (list 5))))
+    (is (= 14 (core/apply f [1 2 3])))
+    (is (= 20 (core/apply f 2 [3 4])))
+    (is (= 26 (core/apply f 3 4 [5]))))
+  (let [f (core/eval (mock-eval-context) [common-bindings]
+            (core/read-string
+              "(fn* [a b c]
+                 (+ a (* b 2) (* c 3)))"))]
+    (is (= 14 (core/apply f (list 1 2 3))))
+    (is (= 20 (core/apply f 2 (list 3 4))))
+    (is (= 26 (core/apply f 3 4 (list 5))))
+    (is (= 14 (core/apply f [1 2 3])))
+    (is (= 20 (core/apply f 2 [3 4])))
+    (is (= 26 (core/apply f 3 4 [5])))))
 
 (deftest core-map
   (is-list? (core/map inc (list 1 2 3)) (list 2 3 4))
   (is-list? (core/map inc [1 2 3]) (list 2 3 4))
-  (let [f (core/eval
-            (fn$ (list (sym$ "x"))
-              (list (sym$ "+") (sym$ "x") 1))
-            basic-env)]
+  (let [f (core/eval (mock-eval-context) [common-bindings]
+            (core/read-string "(fn* [x] (+ x 1))"))]
     (is-list? (core/map f (list 1 2 3)) (list 2 3 4))
     (is-list? (core/map f [1 2 3]) (list 2 3 4))))
 
@@ -554,3 +619,42 @@
   (is (instance? Keyword (core/keyword "a")))
   (is (= (:name (core/keyword "abc")) "abc"))
   (is (= (core/keyword (core/keyword "xyz")) (core/keyword "xyz"))))
+
+(deftest namespaces
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (identical? (-> ctx core/deref :current-ns)
+                    (core/eval ctx [] (sym$ "*ns*")))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (is (identical?
+          (-> ctx core/deref :ns-registry core/deref (get (sym$ "user")))
+          (core/eval ctx [] (list (sym$ "in-ns") (sym$ "user"))))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"foo" nil}
+              :current-ns "foo")
+        foo (-> ctx core/deref :current-ns)
+        bar (core/eval ctx [] (list (sym$ "in-ns") (sym$ "bar")))]
+    (is (instance? Namespace bar))
+    (is (= (sym$ "bar") (:name bar)))
+    (is (identical?
+          bar
+          (-> ctx core/deref :ns-registry core/deref (get (sym$ "bar")))))
+    (is (identical? bar (-> ctx core/deref :current-ns)))
+    (is (identical? bar (core/eval ctx [] (sym$ "*ns*"))))
+    (is (identical?
+          foo
+          (-> ctx core/deref :ns-registry core/deref (get (sym$ "foo"))))))
+  (let [ctx (mock-eval-context
+              :ns-registry {"foo" {(sym$ "x") 42}
+                            "bar" {(sym$ "x") 43
+                                   (sym$ "y") 44}}
+              :current-ns "foo")]
+    (is (= 42 (core/eval ctx [] (sym$ "x"))))
+    (is (= 42 (core/eval ctx [] (sym$ "foo/x"))))
+    (is (= 43 (core/eval ctx [] (sym$ "bar/x"))))
+    (is (thrown? Exception (core/eval ctx [] (sym$ "y"))))
+    (is (= 44 (core/eval ctx [] (sym$ "bar/y"))))
+    (is (thrown? Exception (core/eval ctx [] (sym$ "baz/x"))))))

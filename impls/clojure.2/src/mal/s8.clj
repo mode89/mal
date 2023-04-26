@@ -1,19 +1,18 @@
 (ns mal.s8
-  (:require [mal.core :as core]))
+  (:require [mal.core :as core]
+            [mal.types :as types]))
 
-(def repl-env
-  (core/env-make
-    nil
-    core/core-ns))
-(core/env-set! repl-env (core/symbol "eval")
-  (fn [form]
-    (core/eval form repl-env)))
+(def CONTEXT
+  (core/atom
+    (types/->EvalContext
+      (core/atom {(:name core/core-ns) core/core-ns})
+      core/core-ns)))
 
 (defn READ [input]
   (core/read-string input))
 
-(defn EVAL [form env]
-  (core/eval form env))
+(defn EVAL [form]
+  (core/eval CONTEXT [] form))
 
 (defn PRINT [input]
   (core/pr-str input))
@@ -21,7 +20,7 @@
 (defn rep [input]
   (-> input
       READ
-      (EVAL repl-env)
+      EVAL
       PRINT))
 
 (rep "(def! not
@@ -42,7 +41,7 @@
               (cons 'cond (rest (rest xs)))))))")
 
 (defn -main [& args]
-  (core/env-set! repl-env (core/symbol "*ARGV*") (apply list (rest args)))
+  (core/ns-bind core/core-ns (core/symbol "*ARGV*") (apply list (rest args)))
   (when-some [filename (first args)]
     (rep (core/str "(load-file \"" filename "\")")))
   (loop []

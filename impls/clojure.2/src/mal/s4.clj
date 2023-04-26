@@ -1,17 +1,19 @@
 (ns mal.s4
   (:require [mal.core :as core]
-            [mal.reader :as reader]))
+            [mal.reader :as reader]
+            [mal.types :as types]))
 
-(def repl-env
-  (core/env-make
-    nil
-    core/core-ns))
+(def CONTEXT
+  (core/atom
+    (types/->EvalContext
+      (core/atom {(:name core/core-ns) core/core-ns})
+      core/core-ns)))
 
 (defn READ [input]
   (reader/read-string input))
 
-(defn EVAL [form env]
-  (core/eval form env))
+(defn EVAL [form]
+  (core/eval CONTEXT [] form))
 
 (defn PRINT [input]
   (core/pr-str input))
@@ -19,7 +21,7 @@
 (defn rep [input]
   (-> input
       READ
-      (EVAL repl-env)
+      EVAL
       PRINT))
 
 (rep "(def! not

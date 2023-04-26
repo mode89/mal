@@ -1,24 +1,29 @@
 (ns mal.core
-  (:refer-clojure :exclude [apply atom concat cons deref eval first fn? keys
-                            keyword keyword? list? macroexpand map map? nth
-                            pr-str prn println read-string reset! rest
-                            sequential?  slurp str swap! symbol symbol? vals
-                            vec vector?])
+  (:refer-clojure :exclude [apply atom concat cons deref eval first fn?
+                            keys keyword keyword? list? macroexpand
+                            map map? nth pr-str prn println read-string
+                            reset! rest sequential? slurp str swap! symbol
+                            symbol? vals vec vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.reader :as reader]
-            [mal.types])
-  (:import [mal.types Atom Function Keyword Symbol]))
+            [mal.types :as types])
+  (:import [mal.types Atom Function Keyword Namespace EvalContext]))
 
 (declare apply)
+(declare atom)
 (declare cons)
+(declare deref)
 (declare eval)
 (declare first)
 (declare map)
 (declare nth)
+(declare reset!)
 (declare rest)
 (declare str)
+(declare swap!)
 (declare throw)
+(declare vec)
 
 (defn keyword [name]
   (if (instance? Keyword name)
@@ -28,11 +33,9 @@
 (defn keyword? [x]
   (instance? Keyword x))
 
-(defn symbol [name]
-  (Symbol. name))
+(def symbol types/symbol)
 
-(defn symbol? [x]
-  (instance? Symbol x))
+(def symbol? types/symbol?)
 
 (defn map? [x]
   (or (instance? clojure.lang.PersistentArrayMap x)
@@ -128,6 +131,8 @@
       (clj/str "#<macro " (clj/str object) ">")
     (atom? object)
       (clj/str "(atom " (-> object :value clj/deref) ")")
+    (instance? Namespace object)
+      (clj/str "#<namespace " (-> object :name :name) ">")
     :else
       (clj/str "#<" (clj/pr-str (type object)) " " (clj/pr-str object) ">")))
 
@@ -144,44 +149,81 @@
          (clj/println x#))
        x#)))
 
-(defn env-make [outer bindings]
-  (clj/atom {:outer outer
-             :table bindings}))
+(defn- ns-make [name]
+  (assert (symbol? name) "namespace name must be a symbol")
+  (new Namespace name (atom {})))
 
-(defn env-set! [env key value]
-  (clj/swap! env assoc-in [:table key] value))
+(defn ns-bind [ns name value]
+  (assert (symbol? name) "namespace binding name must be a symbol")
+  (swap! (:bindings ns) assoc name value))
 
-(defn env-get [env key]
-  (let [e (clj/deref env)
-        table (:table e)
-        outer (:outer e)]
-    (if (contains? table key)
-      (clojure.core/get table key)
-      (if (some? outer)
-        (env-get outer key)
-        (mal.core/throw (str "'" (:name key) "' not found"))))))
+(defn- ns-find-or-create [ctx name]
+  (let [registry-atom (-> ctx deref :ns-registry)
+        registry (deref registry-atom)]
+    (if (contains? registry name)
+      (get registry name)
+      (let [new-ns (ns-make name)]
+        (swap! registry-atom assoc name new-ns)
+        new-ns))))
 
-(defn eval-form [ast env]
+(defn- throw-not-found [sym]
+  (mal.core/throw (str "'" (:name sym) "' not found")))
+
+(defn resolve-symbol [ctx locals sym]
+  (assert (symbol? sym))
+  (assert (sequential? locals))
+  (if-some [sym-ns-name (:namespace sym)]
+    (if-some [sym-ns (-> ctx deref
+                         :ns-registry deref
+                         (get (symbol sym-ns-name)))]
+      (let [bindings (-> sym-ns :bindings deref)
+            simp-sym (symbol (:name sym))]
+        (if (contains? bindings simp-sym)
+          (get bindings simp-sym)
+          (throw-not-found sym)))
+      (mal.core/throw (str "namespace '" sym-ns-name "' not found")))
+    (loop [locals* locals]
+      (if (empty? locals*)
+        (if-some [current-ns (-> ctx deref :current-ns)]
+          (let [bindings (-> current-ns :bindings deref)]
+            (if (contains? bindings sym)
+              (get bindings sym)
+              (throw-not-found sym)))
+          (throw-not-found sym))
+        (let [bindings (first locals*)]
+          (if (contains? bindings sym)
+            (get bindings sym)
+            (recur (rest locals*))))))))
+
+(defn eval-value [ctx locals ast]
   (cond
     (symbol? ast)
-      (env-get env ast)
+      (if (= (symbol "*ns*") ast)
+        (-> ctx deref :current-ns)
+        (resolve-symbol ctx locals ast))
     (list? ast)
       (map
         (fn [x]
-          (eval x env))
+          (eval ctx locals x))
         ast)
     (vector? ast)
-      (clj/vec (map (fn [x] (eval x env)) ast))
+      (clj/vec (map (fn [x]
+                      (eval ctx locals x))
+                    ast))
     (map? ast)
       (into {}
         (map
           (fn [[k v]]
-            [(eval k env) (eval v env)])
+            [(eval ctx locals k)
+             (eval ctx locals v)])
           ast))
     :else
       ast))
 
-(defn- -fn-env-template [parameters]
+(defn- fn-env-template
+  "Returns a map of parameter names to functions that extract the
+  corresponding argument from the argument list."
+  [parameters]
   (loop [params parameters
          param-index 0
          template {}]
@@ -202,22 +244,27 @@
                         (fn [args]
                           (nth args param-index)))))))))
 
-(defn- -fn-env-bindings [env-template args]
+(defn- fn-env-bindings
+  "Returns a map of parameter names to the corresponding argument values."
+  [env-template args]
   (reduce-kv
     (fn [env param arg-extractor]
       (assoc env param (arg-extractor args)))
     {}
     env-template))
 
-(defn make-fn* [macro? env params body]
-  (let [env-template (-fn-env-template params)]
+(defn make-fn* [ctx locals macro? params body]
+  (assert (instance? EvalContext ctx))
+  (assert (sequential? locals))
+  (let [env-template (fn-env-template params)]
     (new Function
       macro?
       params
       body
+      ctx
       (fn [args]
-        (env-make env
-          (-fn-env-bindings env-template args))))))
+        (cons (fn-env-bindings env-template args)
+              locals)))))
 
 (defn quasiquote [ast]
   (if (list? ast)
@@ -246,29 +293,29 @@
       :else
         ast)))
 
-(defn macroexpand [form env]
+(defn macroexpand [ctx locals form]
   (if (list? form)
     (let [head (first form)]
       (if (symbol? head)
-        (if-some [macro (try (env-get env head)
+        (if-some [macro (try (resolve-symbol ctx locals head)
                              (catch Exception _ nil))]
           (if (macro? macro)
-            (let [args (rest form)
-                  body (:body macro)
-                  make-env (:make-env macro)]
-              (recur (eval body (make-env args)) env))
+            (let [mctx (:context macro)]
+              (assert (identical? (:ns-registry mctx)
+                                  (:ns-registry (deref ctx))))
+              (apply macro (rest form)))
             form)
           form)
         form))
     form))
 
-(defn eval [form0 env]
+(defn eval [ctx locals form0]
   (if (list? form0)
     (if (empty? form0)
       form0
-      (let [form (macroexpand form0 env)]
+      (let [form (macroexpand ctx locals form0)]
         (if (not (list? form))
-          (eval-form form env)
+          (eval-value ctx locals form)
           (let [head (first form)
                 args (rest form)]
             (condp = head
@@ -277,62 +324,71 @@
                       value-ast (second args)]
                   (assert (= (count args) 2))
                   (assert (symbol? name))
-                  (let [value (eval value-ast env)]
-                    (env-set! env name value)
+                  (let [value (eval ctx locals value-ast)
+                        current-ns (-> ctx deref :current-ns)]
+                    (assert (some? current-ns))
+                    (ns-bind current-ns name value)
                     value))
               (symbol "defmacro!")
                 (let [name (first args)
-                      f (eval (second args) env)]
+                      f (eval ctx locals (second args))]
                   (assert (= (count args) 2))
                   (assert (symbol? name))
                   (assert (fn? f))
-                  (let [macro (assoc f :macro? true)]
-                    (env-set! env name macro)
+                  (let [macro (assoc f :macro? true)
+                        current-ns (-> ctx deref :current-ns)]
+                    (assert (some? current-ns))
+                    (swap! (:bindings current-ns) assoc name macro)
                     macro))
               (symbol "let*")
-                (let [let-env (env-make env {})
-                      bindings (first args)
+                (let [bindings (first args)
                       body (second args)]
                   (assert (even? (count bindings)))
-                  (loop [bs bindings]
-                    (when (>= (count bs) 2)
-                      (let [bname (first bs)
-                            bvalue (second bs)]
-                        (assert (symbol? bname))
-                        (env-set! let-env bname (eval bvalue let-env))
-                        (recur (drop 2 bs)))))
-                  (recur body let-env))
+                  (recur
+                    ctx
+                    (reduce
+                      (fn [locals' [name value]]
+                        (assert (symbol? name))
+                        (cons {name (eval ctx locals' value)} locals'))
+                      locals
+                      (partition 2 bindings))
+                    body))
               (symbol "do")
                 (let [butlast-forms (butlast args)
                       last-form (last args)]
                   (loop [forms butlast-forms]
                     (when-some [form (first forms)]
-                      (eval form env)
+                      (eval ctx locals form)
                       (recur (rest forms))))
-                  (eval last-form env))
+                  (recur ctx locals last-form))
               (symbol "if")
                 (let [nargs (count args)]
                   (assert (>= nargs 2))
                   (assert (<= nargs 3))
-                  (if (eval (first args) env)
-                    (recur (second args) env)
+                  (if (eval ctx locals (first args))
+                    (recur ctx locals (second args))
                     (if (= nargs 3)
-                      (recur (nth args 2) env)
+                      (recur ctx locals (nth args 2))
                       nil)))
               (symbol "fn*")
-                (make-fn* false env (first args) (second args))
+                (make-fn*
+                  (deref ctx)
+                  locals
+                  false
+                  (first args)
+                  (second args))
               (symbol "quote")
                 (do (assert (= (count args) 1))
                     (first args))
               (symbol "quasiquote")
                 (do (assert (= (count args) 1))
-                    (recur (quasiquote (first args)) env))
+                    (recur ctx locals (quasiquote (first args))))
               (symbol "quasiquoteexpand")
                 (do (assert (= (count args) 1))
                     (quasiquote (first args)))
               (symbol "macroexpand")
                 (do (assert (= (count args) 1))
-                    (macroexpand (first args) env))
+                    (macroexpand ctx locals (first args)))
               (symbol "try*")
                 (let [try-expr (first args)]
                   (if-some [catch-form (second args)]
@@ -340,30 +396,42 @@
                         (assert (= (count catch-form) 3))
                         (assert (= (first catch-form) (symbol "catch*")))
                         (try
-                          (eval try-expr env)
+                          (eval ctx locals try-expr)
                           (catch Throwable ex0
                             (let [ex-binding (second catch-form)
                                   _ (assert (symbol? ex-binding))
                                   catch-body (nth catch-form 2)
                                   ex (if (object-exception? ex0)
                                        (object-exception-unwrap ex0)
-                                       ex0)
-                                  catch-env (env-make env {ex-binding ex})]
-                              (eval catch-body catch-env)))))
+                                       ex0)]
+                              (eval ctx
+                                    (cons {ex-binding ex} locals)
+                                    catch-body)))))
                     (do (assert (= (count args) 1))
-                        (recur try-expr env))))
-              (let [f (eval head env)
-                    args (map (fn [x] (eval x env)) args)]
+                        (recur ctx locals try-expr))))
+              (symbol "in-ns")
+                (let [ns-name (first args)]
+                  (assert (= (count args) 1))
+                  (let [ns (ns-find-or-create ctx ns-name)]
+                    (swap! ctx assoc :current-ns ns)
+                    ns))
+              (let [f (eval ctx locals head)
+                    args (map (fn [x] (eval ctx locals x)) args)]
                 (cond
                   (instance? Function f)
-                    (let [body (:body f)
-                          make-env (:make-env f)]
-                      (recur body (make-env args)))
+                    (let [fctx (:context f)
+                          make-locals (:make-locals f)]
+                      (assert (identical?
+                                (:ns-registry fctx)
+                                (:ns-registry (deref ctx))))
+                      (recur (atom fctx)
+                             (make-locals args)
+                             (:body f)))
                   (clj/fn? f)
                     (clj/apply f args)
                   :else
                     (throw (ex-info "Can't call this" {:object f})))))))))
-    (eval-form form0 env)))
+    (eval-value ctx locals form0)))
 
 (defn pr-str [& args]
   (join " "
@@ -394,9 +462,10 @@
 (defn slurp [filename]
   (clj/slurp filename))
 
-(defn deref [a]
-  (assert (atom? a))
-  (clj/deref (:value a)))
+(defn deref [x]
+  (cond
+    (atom? x) (clj/deref (:value x))
+    :else (throw (ex-info "Can't deref this" {:object x}))))
 
 (defn reset! [a v]
   (assert (atom? a))
@@ -438,23 +507,22 @@
 
 (defn apply [f & args]
   (assert (> (count args) 0))
-  (cond
-    (instance? Function f)
-      (let [body (:body f)
-            make-env (:make-env f)]
-        (eval body
-          (make-env (let [rev-args (reverse args)
-                          last-arg (first rev-args)]
-                      (assert (seqable? last-arg))
-                      (reduce
-                        (fn [acc x]
-                          (cons x acc))
-                        last-arg
-                        (rest rev-args))))))
-    (clj/fn? f)
-      (clj/apply clj/apply f args)
-    :else
-      (throw (ex-info "Can't call this" {:object f}))))
+  (let [args* (let [rev-args (reverse args)
+                    last-arg (first rev-args)]
+                (assert (seqable? last-arg))
+                (reduce
+                  (fn [acc x]
+                    (cons x acc))
+                  last-arg
+                  (rest rev-args)))]
+    (cond
+      (instance? Function f)
+        (let [make-locals (:make-locals f)]
+          (eval (atom (:context f)) (make-locals args*) (:body f)))
+      (clj/fn? f)
+        (clj/apply f args*)
+      :else
+        (throw (ex-info "Can't call this" {:object f})))))
 
 (defn map [f coll]
   (clj/map
@@ -480,56 +548,59 @@
     (throw (object-exception obj))))
 
 (def core-ns
-  {(symbol "list") clj/list
-   (symbol "list?") list?
-   (symbol "empty?") clj/empty?
-   (symbol "count") clj/count
-   (symbol "=") =
-   (symbol "<") <
-   (symbol "<=") <=
-   (symbol ">") >
-   (symbol ">=") >=
-   (symbol "+") +
-   (symbol "-") -
-   (symbol "*") *
-   (symbol "/") /
-   (symbol "pr-str") pr-str
-   (symbol "prn") prn
-   (symbol "str") str
-   (symbol "println") println
-   (symbol "read-string") read-string
-   (symbol "slurp") slurp
-   (symbol "atom") atom
-   (symbol "atom?") atom?
-   (symbol "deref") deref
-   (symbol "reset!") reset!
-   (symbol "swap!") swap!
-   (symbol "cons") cons
-   (symbol "concat") concat
-   (symbol "vec") vec
-   (symbol "fn?") fn?
-   (symbol "macro?") macro?
-   (symbol "nth") nth
-   (symbol "first") first
-   (symbol "rest") rest
-   (symbol "throw") mal.core/throw
-   (symbol "apply") apply
-   (symbol "map") map
-   (symbol "nil?") clj/nil?
-   (symbol "true?") clj/true?
-   (symbol "false?") clj/false?
-   (symbol "symbol") symbol
-   (symbol "symbol?") symbol?
-   (symbol "keyword") keyword
-   (symbol "keyword?") keyword?
-   (symbol "vector") clj/vector
-   (symbol "vector?") vector?
-   (symbol "sequential?") sequential?
-   (symbol "hash-map") clj/hash-map
-   (symbol "map?") map?
-   (symbol "assoc") clj/assoc
-   (symbol "dissoc") clj/dissoc
-   (symbol "get") clj/get
-   (symbol "contains?") clj/contains?
-   (symbol "keys") keys
-   (symbol "vals") vals})
+  (new Namespace
+    (symbol "mal.core")
+    (atom
+      {(symbol "list") clj/list
+       (symbol "list?") list?
+       (symbol "empty?") clj/empty?
+       (symbol "count") clj/count
+       (symbol "=") =
+       (symbol "<") <
+       (symbol "<=") <=
+       (symbol ">") >
+       (symbol ">=") >=
+       (symbol "+") +
+       (symbol "-") -
+       (symbol "*") *
+       (symbol "/") /
+       (symbol "pr-str") pr-str
+       (symbol "prn") prn
+       (symbol "str") str
+       (symbol "println") println
+       (symbol "read-string") read-string
+       (symbol "slurp") slurp
+       (symbol "atom") atom
+       (symbol "atom?") atom?
+       (symbol "deref") deref
+       (symbol "reset!") reset!
+       (symbol "swap!") swap!
+       (symbol "cons") cons
+       (symbol "concat") concat
+       (symbol "vec") vec
+       (symbol "fn?") fn?
+       (symbol "macro?") macro?
+       (symbol "nth") nth
+       (symbol "first") first
+       (symbol "rest") rest
+       (symbol "throw") mal.core/throw
+       (symbol "apply") apply
+       (symbol "map") map
+       (symbol "nil?") clj/nil?
+       (symbol "true?") clj/true?
+       (symbol "false?") clj/false?
+       (symbol "symbol") symbol
+       (symbol "symbol?") symbol?
+       (symbol "keyword") keyword
+       (symbol "keyword?") keyword?
+       (symbol "vector") clj/vector
+       (symbol "vector?") vector?
+       (symbol "sequential?") sequential?
+       (symbol "hash-map") clj/hash-map
+       (symbol "map?") map?
+       (symbol "assoc") clj/assoc
+       (symbol "dissoc") clj/dissoc
+       (symbol "get") clj/get
+       (symbol "contains?") clj/contains?
+       (symbol "keys") keys
+       (symbol "vals") vals})))

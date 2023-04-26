@@ -1,26 +1,20 @@
 (ns mal.s6
   (:require [mal.core :as core]
-            [mal.reader :as reader]))
+            [mal.reader :as reader]
+            [mal.types :as types]
+            ))
 
-(def repl-env
-  (core/env-make
-    nil
-    core/core-ns))
-(core/env-set! repl-env (core/symbol "eval")
-  (fn [form]
-    (core/eval form repl-env)))
-(core/env-set! repl-env (core/symbol "load-file")
-  (fn [filename]
-    (core/eval
-      (core/read-string
-        (core/str "(do " (core/slurp filename) "\n" "nil" ")"))
-      repl-env)))
+(def CONTEXT
+  (core/atom
+    (types/->EvalContext
+      (core/atom {(:name core/core-ns) core/core-ns})
+      core/core-ns)))
 
 (defn READ [input]
   (reader/read-string input))
 
-(defn EVAL [form env]
-  (core/eval form env))
+(defn EVAL [form]
+  (core/eval CONTEXT [] form))
 
 (defn PRINT [input]
   (core/pr-str input))
@@ -28,11 +22,19 @@
 (defn rep [input]
   (-> input
       READ
-      (EVAL repl-env)
+      EVAL
       PRINT))
 
+(core/ns-bind core/core-ns (core/symbol "eval") EVAL)
+
+(core/ns-bind core/core-ns (core/symbol "load-file")
+  (fn [filename]
+    (core/eval CONTEXT []
+      (core/read-string
+        (core/str "(do " (core/slurp filename) "\n" "nil" ")")))))
+
 (defn -main [& args]
-  (core/env-set! repl-env (core/symbol "*ARGV*") (apply list (rest args)))
+  (core/ns-bind core/core-ns (core/symbol "*ARGV*") (apply list (rest args)))
   (when-some [filename (first args)]
     (rep (core/str "(load-file \"" filename "\")")))
   (loop []
