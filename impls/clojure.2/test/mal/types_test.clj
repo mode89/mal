@@ -3,6 +3,10 @@
             [mal.types :as types])
   (:import [mal.types Symbol]))
 
+(deftest functions
+  (is (types/fn? (types/->Function false [] nil nil nil)))
+  (is (types/fn? (fn [] nil))))
+
 (deftest symbols
   (let [sym (types/symbol "foo")]
     (is (instance? Symbol sym))

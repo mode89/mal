@@ -1,5 +1,5 @@
 (ns mal.types
-  (:refer-clojure :exclude [symbol symbol?])
+  (:refer-clojure :exclude [fn? symbol symbol?])
   (:require [clojure.string :refer [index-of]]))
 
 (defrecord Atom [value])
@@ -8,6 +8,11 @@
 (defrecord Symbol [namespace name])
 (defrecord Namespace [name bindings])
 (defrecord EvalContext [ns-registry current-ns])
+
+(defn fn? [x]
+  (or (and (instance? Function x)
+           (not (:macro? x)))
+      (clojure.core/fn? x)))
 
 (defn symbol [name]
   (assert (string? name))

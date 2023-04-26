@@ -41,10 +41,7 @@
   (or (instance? clojure.lang.PersistentArrayMap x)
       (instance? clojure.lang.PersistentHashMap x)))
 
-(defn fn? [x]
-  (or (and (instance? Function x)
-           (not (:macro? x)))
-      (clj/fn? x)))
+(def fn? types/fn?)
 
 (defn macro? [x]
   (and (instance? Function x)
