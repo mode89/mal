@@ -12,6 +12,9 @@
   (assert (string? name))
   (core/keyword name))
 
+(defn quote$ [form]
+  (list (sym$ "quote") form))
+
 (defn qq$ [form]
   (list (sym$ "quasiquote") form))
 
@@ -359,29 +362,23 @@
   (is (not (core/list? []))))
 
 (deftest eval-quote
-  (is (= 42 (core/eval (mock-eval-context) []
-              (list (core/symbol "quote") 42))))
+  (is (= 42 (core/eval (mock-eval-context) [] (quote$ 42))))
   (is (= (list 1 2 3) (core/eval (mock-eval-context) []
-                        (list (core/symbol "quote") (list 1 2 3)))))
-  (is (= (core/symbol "foo")
-         (core/eval (mock-eval-context) []
-           (list (core/symbol "quote") (core/symbol "foo")))))
-  (is (= (list (core/symbol "quote") 42)
-         (core/eval (mock-eval-context) []
-           (list (core/symbol "quote") (list (core/symbol "quote") 42)))))
-  (is (= [1 2 3] (core/eval (mock-eval-context) []
-                   (list (core/symbol "quote") [1 2 3]))))
+                        (quote$ (list 1 2 3)))))
+  (is (= (sym$ "foo") (core/eval (mock-eval-context) []
+                        (quote$ (sym$ "foo")))))
+  (is (= (quote$ 42) (core/eval (mock-eval-context) []
+                       (quote$ (quote$ 42)))))
+  (is (= [1 2 3] (core/eval (mock-eval-context) [] (quote$ [1 2 3]))))
   (is (= {(core/keyword "a") 1
           (core/keyword "b") 2}
          (core/eval (mock-eval-context) []
-           (list (core/symbol "quote")
-                 {(core/keyword "a") 1
-                  (core/keyword "b") 2})))))
+           (quote$ {(core/keyword "a") 1
+                    (core/keyword "b") 2})))))
 
 (deftest core-quasiquote
   (is (= (core/quasiquote 42) 42))
-  (is (= (core/quasiquote (core/symbol "foo"))
-         (list (core/symbol "quote") (core/symbol "foo"))))
+  (is (= (core/quasiquote (sym$ "foo")) (quote$ (sym$ "foo"))))
   (is (= (core/quasiquote (list)) (list)))
   (is (= (core/quasiquote (list (core/symbol "unquote") 42)) 42))
   (is (= (core/quasiquote (list 42)) (list (core/symbol "cons") 42 '())))
