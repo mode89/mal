@@ -19,4 +19,5 @@
   (let [sym (types/symbol "/")]
     (is (instance? Symbol sym))
     (is (= "/" (:name sym)))
-    (is (= nil (:namespace sym)))))
+    (is (= nil (:namespace sym))))
+  (is (types/symbol? (Symbol. nil "foo"))))
