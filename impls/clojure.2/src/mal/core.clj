@@ -154,7 +154,7 @@
   (new Namespace name (atom {})))
 
 (defn ns-bind [ns name value]
-  (assert (symbol? name) "namespace binding name must be a symbol")
+  (assert (symbol? name) "binding name must be a symbol")
   (swap! (:bindings ns) assoc name value))
 
 (defn- ns-find-or-create [ctx name]
@@ -323,7 +323,6 @@
                 (let [name (first args)
                       value-ast (second args)]
                   (assert (= (count args) 2))
-                  (assert (symbol? name))
                   (let [value (eval ctx locals value-ast)
                         current-ns (-> ctx deref :current-ns)]
                     (assert (some? current-ns))

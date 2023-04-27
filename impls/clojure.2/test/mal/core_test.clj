@@ -157,7 +157,17 @@
                         (def$ "a" (list (sym$ "list") 1 2)))))
     (is (= {:ns-registry {"user" {(sym$ "a") (list 1 2)}}
             :current-ns "user"}
-           (sample-eval-context ctx)))))
+           (sample-eval-context ctx))))
+  (is (re-find #"binding name must be a symbol"
+        (try
+          (core/eval
+            (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+            []
+            (list (sym$ "def!") "a" 42))
+          (catch Error ex
+            (.getMessage ex))))))
 
 (deftest eval-let
   (let [ctx (mock-eval-context)]
@@ -606,6 +616,12 @@
     (is (identical?
           (-> ctx core/deref :ns-registry core/deref (get (sym$ "user")))
           (core/eval ctx [] (list (sym$ "in-ns") (quote$ (sym$ "user")))))))
+  (is (re-find #"namespace name must be a symbol"
+        (try
+          (core/eval (mock-eval-context) []
+            (list (sym$ "in-ns") "user"))
+          (catch Error ex
+            (.getMessage ex)))))
   (let [ctx (mock-eval-context
               :ns-registry {"foo" nil}
               :current-ns "foo")
