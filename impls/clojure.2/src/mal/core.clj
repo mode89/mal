@@ -195,31 +195,6 @@
             (get bindings sym)
             (recur (rest locals*))))))))
 
-(defn eval-value [ctx locals ast]
-  (cond
-    (symbol? ast)
-      (if (= (symbol "*ns*") ast)
-        (-> ctx deref :current-ns)
-        (resolve-symbol ctx locals ast))
-    (list? ast)
-      (map
-        (fn [x]
-          (eval ctx locals x))
-        ast)
-    (vector? ast)
-      (clj/vec (map (fn [x]
-                      (eval ctx locals x))
-                    ast))
-    (map? ast)
-      (into {}
-        (map
-          (fn [[k v]]
-            [(eval ctx locals k)
-             (eval ctx locals v)])
-          ast))
-    :else
-      ast))
-
 (defn- fn-env-template
   "Returns a map of parameter names to functions that extract the
   corresponding argument from the argument list."
@@ -310,12 +285,11 @@
     form))
 
 (defn eval [ctx locals form0]
-  (if (list? form0)
-    (if (empty? form0)
-      form0
-      (let [form (macroexpand ctx locals form0)]
-        (if (not (list? form))
-          (eval-value ctx locals form)
+  (let [form (macroexpand ctx locals form0)]
+    (cond
+      (list? form)
+        (if (empty? form)
+          form
           (let [head (first form)
                 args (rest form)]
             (condp = head
@@ -429,8 +403,24 @@
                   (clj/fn? f)
                     (clj/apply f args)
                   :else
-                    (throw (ex-info "Can't call this" {:object f})))))))))
-    (eval-value ctx locals form0)))
+                    (throw (ex-info "Can't call this" {:object f})))))))
+      (symbol? form)
+        (if (= (symbol "*ns*") form)
+          (-> ctx deref :current-ns)
+          (resolve-symbol ctx locals form))
+      (vector? form)
+        (clj/vec (map (fn [x]
+                        (eval ctx locals x))
+                      form))
+      (map? form)
+        (into {}
+          (map
+            (fn [[k v]]
+              [(eval ctx locals k)
+               (eval ctx locals v)])
+            form))
+      :else
+        form)))
 
 (defn pr-str [& args]
   (join " "
