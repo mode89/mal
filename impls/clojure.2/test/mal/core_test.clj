@@ -109,10 +109,10 @@
   (is (= (core/eval (mock-eval-context) nil 42) 42))
   (is (= (core/eval (mock-eval-context) nil '()) '()))
   (is (= (core/eval (mock-eval-context) [{(sym$ "a") 42}] (sym$ "a")) 42))
-  (try (core/eval (mock-eval-context) [] (sym$ "a"))
-    (catch Throwable ex
-      (is (core/object-exception? ex))
-      (is (= (core/object-exception-unwrap ex) "'a' not found"))))
+  (is (= "'a' not found"
+         (try (core/eval (mock-eval-context) [] (sym$ "a"))
+           (catch Throwable ex
+             (core/object-exception-unwrap ex)))))
   (is (= [1 "2" [3 4 5]]
          (core/eval (mock-eval-context) [{(sym$ "c") [3 4 5]}]
            [1 "2" (sym$ "c")])))
@@ -130,13 +130,15 @@
   (is (= 9001 (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}
                                                         {(sym$ "b") 9001}]
                 (sym$ "b"))))
-  (try
-    (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}
-                                              {(sym$ "b") 9001}]
-      (sym$ "c"))
-    (catch Throwable ex
-      (is (core/object-exception? ex))
-      (is (= (core/object-exception-unwrap ex) "'c' not found"))))
+  (is (= "'c' not found"
+         (try
+           (core/resolve-symbol
+             (mock-eval-context)
+             [{(sym$ "a") 42}
+              {(sym$ "b") 9001}]
+             (sym$ "c"))
+           (catch Throwable ex
+             (core/object-exception-unwrap ex)))))
   (is (= 1234 (core/resolve-symbol
                 (mock-eval-context
                   :ns-registry {"foo" {(sym$ "c") 1234}}
@@ -144,17 +146,17 @@
                 [{(sym$ "a") 42}
                  {(sym$ "b") 9001}]
                 (sym$ "c"))))
-  (try
-    (core/resolve-symbol
-      (mock-eval-context
-        :ns-registry {"foo" {(sym$ "c") 1234}}
-        :current-ns "foo")
-      [{(sym$ "a") 42}
-       {(sym$ "b") 9001}]
-      (sym$ "d"))
-    (catch Throwable ex
-      (is (core/object-exception? ex))
-      (is (= (core/object-exception-unwrap ex) "'d' not found")))))
+  (is (= "'d' not found"
+         (try
+           (core/resolve-symbol
+             (mock-eval-context
+               :ns-registry {"foo" {(sym$ "c") 1234}}
+               :current-ns "foo")
+             [{(sym$ "a") 42}
+              {(sym$ "b") 9001}]
+             (sym$ "d"))
+           (catch Throwable ex
+             (core/object-exception-unwrap ex))))))
 
 (deftest eval-def
   (let [ctx (mock-eval-context
@@ -549,11 +551,9 @@
   (is (thrown? Exception (core/rest 42))))
 
 (deftest exceptions
-  (try
-    (core/throw 42)
-    (catch Throwable ex
-      (is (core/object-exception? ex))
-      (is (= (core/object-exception-unwrap ex) 42))))
+  (is (= 42 (try (core/throw 42)
+              (catch Throwable ex
+                (core/object-exception-unwrap ex)))))
   (is (= 123 (core/eval (mock-eval-context) [] (try$ 123 "e" 456))))
   (is (= "exc is: 'abc' not found"
          (core/eval (mock-eval-context) [{(sym$ "str") core/str}]
@@ -569,12 +569,13 @@
                   (throw$ "e1")
                   "e" (throw$ "e2"))
                 "e" "c2"))))
-  (try
-    (core/eval (mock-eval-context) []
-      (try$ (sym$ "xyz")))
-    (catch Throwable ex
-      (is (core/object-exception? ex))
-      (is (= (core/object-exception-unwrap ex) "'xyz' not found")))))
+  (is (= "'xyz' not found"
+         (try (core/eval (mock-eval-context) [] (try$ (sym$ "xyz")))
+           (catch Throwable ex
+             (core/object-exception-unwrap ex)))))
+  (is (= "abc" (try (core/throw (Exception. "abc"))
+                    (catch Exception e
+                      (.getMessage e))))))
 
 (deftest core-apply
   (let [f (fn [a b c]
