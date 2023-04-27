@@ -501,8 +501,7 @@
            (fn* (pred a b)
              `(if ~pred ~b ~a)))"))
     (is (= 8 (core/eval ctx [] (list (sym$ "unless") true 7 8))))
-    (is (= 7 (core/eval ctx [] (list (sym$ "unless") false 7 8))))
-    ))
+    (is (= 7 (core/eval ctx [] (list (sym$ "unless") false 7 8))))))
 
 (deftest core-nth
   (is (= (core/nth nil 0) nil))
