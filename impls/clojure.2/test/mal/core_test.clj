@@ -1,8 +1,11 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
-            [mal.test.utils :refer [is-list? is-vector?]])
-  (:import [mal.types EvalContext Function Keyword Namespace]))
+            [mal.test.utils :refer [is-list?
+                                    is-vector?
+                                    mock-eval-context
+                                    sample-eval-context]])
+  (:import [mal.types Function Keyword Namespace]))
 
 (defn sym$ [name]
   (assert (string? name))
@@ -77,33 +80,6 @@
    (core/symbol "cons") core/cons
    (core/symbol "concat") core/concat
    (core/symbol "vec") core/vec})
-
-(defn sample-namespace [ns]
-  (-> ns :bindings core/deref))
-
-(defn sample-eval-context [ctx]
-  {:ns-registry (->> ctx
-                     core/deref
-                     :ns-registry
-                     core/deref
-                     (map (fn [[ns-name ns]]
-                            [(:name ns-name) (sample-namespace ns)]))
-                     (into {}))
-   :current-ns (-> ctx core/deref :current-ns :name :name)})
-
-(defn mock-ns [name bindings]
-  (Namespace. (core/symbol name) (core/atom bindings)))
-
-(defn mock-eval-context [& {:keys [ns-registry current-ns]}]
-  (let [registry (into {}
-                   (map (fn [[name bindings]]
-                          [(core/symbol name) (mock-ns name bindings)])
-                        ns-registry))]
-    (core/atom
-      (EvalContext.
-        (core/atom registry)
-        (when (some? current-ns)
-          (get registry (core/symbol current-ns)))))))
 
 (deftest core-eval
   (is (= (core/eval (mock-eval-context) nil 42) 42))

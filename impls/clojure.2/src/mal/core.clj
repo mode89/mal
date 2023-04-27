@@ -123,15 +123,18 @@
                       (flatten (into [] object))))
                \} )
     (fn? object)
-      (clj/str "#<function " (clj/str object) ">")
+      (clj/str "#function[" (clj/str object) "]")
     (macro? object)
-      (clj/str "#<macro " (clj/str object) ">")
+      (clj/str "#macro[" (clj/str object) "]")
     (atom? object)
       (clj/str "(atom " (-> object :value clj/deref) ")")
     (instance? Namespace object)
-      (clj/str "#<namespace " (-> object :name :name) ">")
+      (clj/str "#namespace[" (-> object :name :name) "]")
     :else
-      (clj/str "#<" (clj/pr-str (type object)) " " (clj/pr-str object) ">")))
+      (clj/str "#object["
+               (clj/pr-str (type object))
+               " "
+               (clj/pr-str object) "]")))
 
 (defn debug-macro [x]
   (let [m (meta x)

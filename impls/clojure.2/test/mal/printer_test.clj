@@ -1,6 +1,7 @@
 (ns mal.printer-test
   (:require [clojure.test :refer [deftest is]]
-            [mal.core :as core]))
+            [mal.core :as core]
+            [mal.test.utils :refer [mock-eval-context mock-ns]]))
 
 (deftest core-pr-object
   (is (= (core/pr-object 1 true) "1"))
@@ -31,4 +32,18 @@
   (is (= (core/pr-object ["a\"b" "c\nd" "e\\f" "g\th"] false)
          "[a\"b c\nd e\\f g\th]"))
   (is (= (core/pr-object {"a\"b" "c\nd" "e\\f" "g\th"} false)
-         "{a\"b c\nd e\\f g\th}")))
+         "{a\"b c\nd e\\f g\th}"))
+  (is (re-matches #"#function\[.*\]" (core/pr-object + false)))
+  (is (re-matches #"#macro\[.*\]"
+        (core/pr-object
+          (core/eval
+            (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+            []
+            (core/read-string "(defmacro! foo (fn* [x] x))"))
+          false)))
+  (is (= "(atom 42)" (core/pr-object (core/atom 42) false)))
+  (is (= "#namespace[some.random.namespace.name]"
+        (core/pr-object (mock-ns "some.random.namespace.name" {}) false)))
+  (is (re-matches #"#object\[.*\]" (core/pr-object (Object.) false))))
