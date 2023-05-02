@@ -431,7 +431,9 @@
 (defn str [& args]
   (join ""
     (map (fn [x]
-           (pr-object x false))
+           (if (some? x)
+             (pr-object x false)
+             ""))
          args)))
 
 (defn prn [& args]

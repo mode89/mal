@@ -292,7 +292,11 @@
   (is (= (core/str) ""))
   (is (= (core/str 1) "1"))
   (is (= (core/str 1 2 3) "123"))
-  (is (= (core/str "a\"b") "a\"b")))
+  (is (= (core/str "a\"b") "a\"b"))
+  (is (= (core/str "a\"b" 1 2 3) "a\"b123"))
+  (is (= "123[4 5 6](7 8 9)" (core/str 1 2 3 [4 5 6] (list 7 8 9))))
+  (is (= "" (core/str nil)))
+  (is (= "123" (core/str 1 nil 2 nil 3))))
 
 (deftest eval-tail-call-optimization
   (let [ctx (mock-eval-context
