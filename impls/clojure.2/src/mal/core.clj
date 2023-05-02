@@ -167,11 +167,16 @@
         new-ns))))
 
 (defn- throw-not-found [sym]
-  (mal.core/throw (str "'" (:name sym) "' not found")))
+  (mal.core/throw
+    (str "'"
+         (when-some [namespace (:namespace sym)]
+           (str namespace "/"))
+         (:name sym)
+         "' not found")))
 
 (defn resolve-symbol [ctx locals sym]
-  (assert (symbol? sym))
-  (assert (sequential? locals))
+  (assert (symbol? sym) "must be a symbol")
+  (assert (sequential? locals) "locals must be a sequential collection")
   (if-some [sym-ns-name (:namespace sym)]
     (if-some [sym-ns (-> ctx deref
                          :ns-registry deref

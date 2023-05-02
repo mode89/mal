@@ -132,7 +132,24 @@
               {(sym$ "b") 9001}]
              (sym$ "d"))
            (catch Throwable ex
-             (core/object-exception-unwrap ex))))))
+             (core/object-exception-unwrap ex)))))
+  (is (re-find #"must be a symbol"
+        (try (core/resolve-symbol
+               (mock-eval-context
+                 :ns-registry {"foo" {(sym$ "x") 42}}
+                 :current-ns "foo")
+               []
+               "x")
+          (catch Error e
+            (.getMessage e)))))
+  (is (re-find #"locals must be a sequential collection"
+        (try (core/resolve-symbol
+               (mock-eval-context)
+               {"a" 1
+                "b" 2}
+               (sym$ "b"))
+          (catch Error e
+            (.getMessage e))))))
 
 (deftest eval-def
   (let [ctx (mock-eval-context
@@ -648,6 +665,16 @@
     (is (= 42 (core/eval ctx [] (sym$ "x"))))
     (is (= 42 (core/eval ctx [] (sym$ "foo/x"))))
     (is (= 43 (core/eval ctx [] (sym$ "bar/x"))))
-    (is (thrown? Exception (core/eval ctx [] (sym$ "y"))))
+    (is (re-find #"'y' not found"
+          (try (core/eval ctx [] (sym$ "y"))
+            (catch Exception ex
+              (core/object-exception-unwrap ex)))))
     (is (= 44 (core/eval ctx [] (sym$ "bar/y"))))
-    (is (thrown? Exception (core/eval ctx [] (sym$ "baz/x"))))))
+    (is (re-find #"namespace 'baz' not found"
+          (try (core/eval ctx [] (sym$ "baz/x"))
+            (catch Exception ex
+              (core/object-exception-unwrap ex)))))
+    (is (re-find #"'bar/z' not found"
+          (try (core/eval ctx [] (sym$ "bar/z"))
+            (catch Exception ex
+              (core/object-exception-unwrap ex)))))))
