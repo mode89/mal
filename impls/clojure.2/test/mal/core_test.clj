@@ -184,7 +184,37 @@
             []
             (list (sym$ "def!") "a" 42))
           (catch Error ex
-            (.getMessage ex))))))
+            (.getMessage ex)))))
+  (is (re-find #"def! expects 2 arguments"
+        (try
+          (core/eval
+            (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+            []
+            (list (sym$ "def!") (sym$ "x")))
+          (catch Error e
+            (.getMessage e)))))
+  (is (re-find #"def! expects 2 arguments"
+        (try
+          (core/eval
+            (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+            []
+            (list (sym$ "def!") (sym$ "x") 42 43))
+          (catch Error e
+            (.getMessage e)))))
+  (is (re-find #"no current namespace"
+        (try
+          (core/eval
+            (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns nil)
+            []
+            (list (sym$ "def!") (sym$ "x") 42))
+          (catch Error e
+            (.getMessage e))))))
 
 (deftest eval-let
   (let [ctx (mock-eval-context)]

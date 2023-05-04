@@ -303,10 +303,10 @@
               (symbol "def!")
                 (let [name (first args)
                       value-ast (second args)]
-                  (assert (= (count args) 2))
+                  (assert (= (count args) 2) "def! expects 2 arguments")
                   (let [value (eval ctx locals value-ast)
                         current-ns (-> ctx deref :current-ns)]
-                    (assert (some? current-ns))
+                    (assert (some? current-ns) "no current namespace")
                     (ns-bind current-ns name value)
                     value))
               (symbol "defmacro!")
