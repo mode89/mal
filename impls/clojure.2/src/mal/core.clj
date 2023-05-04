@@ -312,12 +312,13 @@
               (symbol "defmacro!")
                 (let [name (first args)
                       f (eval ctx locals (second args))]
-                  (assert (= (count args) 2))
-                  (assert (symbol? name))
-                  (assert (fn? f))
+                  (assert (= (count args) 2) "defmacro! expects 2 arguments")
+                  (assert (symbol? name) "name of macro must be a symbol")
+                  (assert (fn? f)
+                          "last argument to defmacro! must be a function")
                   (let [macro (assoc f :macro? true)
                         current-ns (-> ctx deref :current-ns)]
-                    (assert (some? current-ns))
+                    (assert (some? current-ns) "no current namespace")
                     (swap! (:bindings current-ns) assoc name macro)
                     macro))
               (symbol "let*")

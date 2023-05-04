@@ -499,7 +499,32 @@
            (-> ns-bindings
                core/deref
                (get (sym$ "dup"))
-               (select-keys [:macro? :params :body :context]))))))
+               (select-keys [:macro? :params :body :context])))))
+  (is (re-find #"defmacro! expects 2 arguments"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "defmacro!") (sym$ "foo")))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"defmacro! expects 2 arguments"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "defmacro!") (sym$ "foo")
+                     (fn$ [] 42) (fn$ [] 43)))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"name of macro must be a symbol"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "defmacro!") 42 (fn$ [] 42)))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"last argument to defmacro! must be a function"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "defmacro!") (sym$ "foo") 42))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"no current namespace"
+        (try (core/eval
+               (mock-eval-context
+                 :ns-registry {"user" nil}
+                 :current-ns nil)
+               []
+               (list (sym$ "defmacro!") (sym$ "foo") (fn$ [] 42)))
+          (catch Error e (.getMessage e))))))
 
 (deftest core-macroexpand
   (is (= 42 (core/macroexpand (mock-eval-context) [] 42)))
