@@ -210,12 +210,14 @@
     (if (empty? params)
       template
       (let [param (first params)]
-        (assert (symbol? param))
+        (assert (symbol? param) "function parameter must be a symbol")
         (if (= (:name param) "&")
-          (let [rest-arg (second params)]
-            (assert (symbol? rest-arg))
-            (assert (= (count params) 2))
-            (assoc template rest-arg
+          (let [var-params (second params)]
+            (assert (symbol? var-params)
+                    "variadic parameters must be a symbol")
+            (assert (= (count params) 2)
+                    "expected only one parameter after &")
+            (assoc template var-params
                    (fn [args]
                      (drop param-index args))))
           (recur (rest params)

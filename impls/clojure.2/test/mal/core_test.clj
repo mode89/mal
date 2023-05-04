@@ -297,7 +297,22 @@
              (core/eval ctx []
                (fn$ (list (sym$ "a") (sym$ "b") (sym$ "c"))
                  (list (sym$ "+") (sym$ "a") (sym$ "b") (sym$ "c"))))
-             [:macro? :params :body :context])))))
+             [:macro? :params :body :context]))))
+  (is (re-find #"function parameter must be a symbol"
+        (try (core/eval (mock-eval-context) []
+               (fn$ (list 42)))
+          (catch Error e
+            (.getMessage e)))))
+  (is (re-find #"variadic parameters must be a symbol"
+        (try (core/eval (mock-eval-context) []
+               (fn$ (list (sym$ "x") (sym$ "&") 42)))
+          (catch Error e
+            (.getMessage e)))))
+  (is (re-find #"expected only one parameter after &"
+        (try (core/eval (mock-eval-context) []
+               (fn$ (list (sym$ "x") (sym$ "&") (sym$ "y") (sym$ "z"))))
+          (catch Error e
+            (.getMessage e))))))
 
 (deftest core-pr-str
   (is (= (core/pr-str) ""))
