@@ -243,7 +243,19 @@
                                             (sym$ "b")))
                  (sym$ "c")))))
     (is (= {:ns-registry {} :current-ns nil}
-           (sample-eval-context ctx)))))
+           (sample-eval-context ctx))))
+  (is (re-find #"let\* expects even number of forms in bindings"
+        (try (core/eval (mock-eval-context) []
+                (let$ (list (sym$ "a") 1
+                            (sym$ "b"))
+                  (sym$ "a")))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"binding name must be a symbol"
+        (try (core/eval (mock-eval-context) []
+                (let$ (list (sym$ "a") 1
+                            42 2)
+                  (sym$ "a")))
+          (catch Error e (.getMessage e))))))
 
 (deftest eval-do
   (let [ctx (mock-eval-context)]

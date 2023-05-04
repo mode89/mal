@@ -324,12 +324,14 @@
               (symbol "let*")
                 (let [bindings (first args)
                       body (second args)]
-                  (assert (even? (count bindings)))
+                  (assert (even? (count bindings))
+                          "let* expects even number of forms in bindings")
                   (recur
                     ctx
                     (reduce
                       (fn [locals' [name value]]
-                        (assert (symbol? name))
+                        (assert (symbol? name)
+                                "binding name must be a symbol")
                         (cons {name (eval ctx locals' value)} locals'))
                       locals
                       (partition 2 bindings))
