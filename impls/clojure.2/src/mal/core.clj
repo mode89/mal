@@ -346,8 +346,8 @@
                   (recur ctx locals last-form))
               (symbol "if")
                 (let [nargs (count args)]
-                  (assert (>= nargs 2))
-                  (assert (<= nargs 3))
+                  (assert (>= nargs 2) "if-form expects at least 2 arguments")
+                  (assert (<= nargs 3) "if-form expects at most 3 arguments")
                   (if (eval ctx locals (first args))
                     (recur ctx locals (second args))
                     (if (= nargs 3)

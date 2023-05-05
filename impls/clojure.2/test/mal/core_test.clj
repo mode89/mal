@@ -36,7 +36,7 @@
 
 (defn if$
   ([pred then]
-    (if$ pred then nil))
+    (list (sym$ "if") pred then))
   ([pred then else]
     (list (sym$ "if") pred then else)))
 
@@ -299,7 +299,15 @@
                  (def$ "b" 2)))))
     (is (= {:ns-registry {"user" {(sym$ "b") 2}}
             :current-ns "user"}
-           (sample-eval-context ctx)))))
+           (sample-eval-context ctx))))
+  (is (re-find #"expects at least 2 arguments"
+        (try (core/eval (mock-eval-context) []
+                (list (sym$ "if") true))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"expects at most 3 arguments"
+        (try (core/eval (mock-eval-context) []
+                (list (sym$ "if") true 1 2 3))
+          (catch Error e (.getMessage e))))))
 
 (deftest eval-fn
   (let [ctx (mock-eval-context
