@@ -685,7 +685,29 @@
              (core/object-exception-unwrap ex)))))
   (is (= "abc" (try (core/throw (Exception. "abc"))
                     (catch Exception e
-                      (.getMessage e))))))
+                      (.getMessage e)))))
+  (is (re-find #"try\* expects at most 2 arguments"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "try*") (sym$ "a")
+                     (list (sym$ "catch*") (sym$ "e") 1)
+                     (list (sym$ "catch*") (sym$ "e") 2)))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"try\* expects catch\* form as second argument"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "try*") (sym$ "a")
+                     (list (sym$ "catch") (sym$ "e") 42)))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"catch\* expects 3 arguments"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "try*") (sym$ "a")
+                     (list (sym$ "catch*") (sym$ "e") 1 2)))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"exception object must be a symbol"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "try*") (sym$ "a")
+                     (list (sym$ "catch*") "e" 42)))
+          (catch Error e (.getMessage e)))))
+  (is (nil? (core/eval (mock-eval-context) [] (list (sym$ "try*"))))))
 
 (deftest core-apply
   (let [f (fn [a b c]

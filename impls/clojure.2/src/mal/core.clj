@@ -376,14 +376,18 @@
               (symbol "try*")
                 (let [try-expr (first args)]
                   (if-some [catch-form (second args)]
-                    (do (assert (= (count args) 2))
-                        (assert (= (count catch-form) 3))
-                        (assert (= (first catch-form) (symbol "catch*")))
+                    (do (assert (<= (count args) 2)
+                          "try* expects at most 2 arguments")
+                        (assert (= (first catch-form) (symbol "catch*"))
+                          "try* expects catch* form as second argument")
+                        (assert (= (count catch-form) 3)
+                          "catch* expects 3 arguments")
                         (try
                           (eval ctx locals try-expr)
                           (catch Throwable ex0
                             (let [ex-binding (second catch-form)
-                                  _ (assert (symbol? ex-binding))
+                                  _ (assert (symbol? ex-binding)
+                                      "exception object must be a symbol")
                                   catch-body (nth catch-form 2)
                                   ex (if (object-exception? ex0)
                                        (object-exception-unwrap ex0)
@@ -391,7 +395,7 @@
                               (eval ctx
                                     (cons {ex-binding ex} locals)
                                     catch-body)))))
-                    (do (assert (= (count args) 1))
+                    (do (assert (<= (count args) 1))
                         (recur ctx locals try-expr))))
               (symbol "in-ns")
                 (let [ns-name (eval ctx locals (first args))]
