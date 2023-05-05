@@ -735,7 +735,19 @@
     (is (= 26 (core/apply f 3 4 (list 5))))
     (is (= 14 (core/apply f [1 2 3])))
     (is (= 20 (core/apply f 2 [3 4])))
-    (is (= 26 (core/apply f 3 4 [5])))))
+    (is (= 26 (core/apply f 3 4 [5]))))
+  (is (re-find #"apply expects at least 2 arguments"
+        (try (core/apply identity)
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"last argument to apply must be a sequence"
+        (try (core/apply identity 1 2 3)
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"Can't call this"
+        (try (core/apply "identity" [1 2 3])
+          (catch Exception ex (.getMessage ex)))))
+  (is (re-find #"Can't call this"
+        (try (core/apply 42 [4 5])
+          (catch Exception ex (.getMessage ex))))))
 
 (deftest core-map
   (is-list? (core/map inc (list 1 2 3)) (list 2 3 4))

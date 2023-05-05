@@ -512,10 +512,11 @@
   (clj/rest coll))
 
 (defn apply [f & args]
-  (assert (> (count args) 0))
+  (assert (> (count args) 0) "apply expects at least 2 arguments")
   (let [args* (let [rev-args (reverse args)
                     last-arg (first rev-args)]
-                (assert (seqable? last-arg))
+                (assert (seqable? last-arg)
+                  "last argument to apply must be a sequence")
                 (reduce
                   (fn [acc x]
                     (cons x acc))
