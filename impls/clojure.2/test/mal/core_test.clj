@@ -448,7 +448,14 @@
           (core/keyword "b") 2}
          (core/eval (mock-eval-context) []
            (quote$ {(core/keyword "a") 1
-                    (core/keyword "b") 2})))))
+                    (core/keyword "b") 2}))))
+  (is (re-find #"quote expects 1 argument"
+        (try (core/eval (mock-eval-context) [] (list (sym$ "quote")))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"quote expects 1 argument"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "quote") (sym$ "a") (sym$ "b")))
+          (catch Error e (.getMessage e))))))
 
 (deftest core-quasiquote
   (is (= (core/quasiquote 42) 42))
@@ -498,7 +505,14 @@
     (is (= (eval-qq (list 0 (sym$ "unquote")))
            (list 0 (sym$ "unquote"))))
     (is (= (eval-qq (list 0 (sym$ "splice-unquote")))
-           (list 0 (sym$ "splice-unquote"))))))
+           (list 0 (sym$ "splice-unquote")))))
+  (is (re-find #"quasiquote expects 1 argument"
+        (try (core/eval (mock-eval-context) [] (list (sym$ "quasiquote")))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"quasiquote expects 1 argument"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "quasiquote") (sym$ "a") (sym$ "b")))
+          (catch Error e (.getMessage e))))))
 
 (deftest eval-defmacro
   (let [ctx (mock-eval-context
