@@ -803,4 +803,14 @@
     (is (re-find #"'bar/z' not found"
           (try (core/eval ctx [] (sym$ "bar/z"))
             (catch Exception ex
-              (core/object-exception-unwrap ex)))))))
+              (core/object-exception-unwrap ex))))))
+  (is (re-find #"in-ns expects 1 argument"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "in-ns")))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"in-ns expects 1 argument"
+        (try (core/eval (mock-eval-context) []
+               (list (sym$ "in-ns")
+                     (quote$ (sym$ "foo"))
+                     (quote$ (sym$ "bar"))))
+          (catch Error e (.getMessage e))))))

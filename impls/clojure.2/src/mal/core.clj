@@ -399,7 +399,7 @@
                         (recur ctx locals try-expr))))
               (symbol "in-ns")
                 (let [ns-name (eval ctx locals (first args))]
-                  (assert (= (count args) 1))
+                  (assert (= (count args) 1) "in-ns expects 1 argument")
                   (let [ns (ns-find-or-create ctx ns-name)]
                     (swap! ctx assoc :current-ns ns)
                     ns))
