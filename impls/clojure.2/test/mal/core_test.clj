@@ -98,7 +98,15 @@
   (is (= 49 (core/eval (mock-eval-context)
                        [{(sym$ "foo") (fn [x y] (+ x y))
                          (sym$ "bar") 42}]
-              (list (sym$ "foo") 7 (sym$ "bar"))))))
+              (list (sym$ "foo") 7 (sym$ "bar")))))
+  (is (re-find #"Can't call this"
+        (try (core/eval (mock-eval-context) [{(sym$ "foo") 42}]
+               (list (sym$ "foo")))
+          (catch Exception ex (.getMessage ex)))))
+  (is (re-find #"Can't call this"
+        (try (core/eval (mock-eval-context) [{(sym$ "foo") identity}]
+                (list "foo" 42))
+          (catch Exception ex (.getMessage ex))))))
 
 (deftest resolve-symbol
   (is (= 42 (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}]
