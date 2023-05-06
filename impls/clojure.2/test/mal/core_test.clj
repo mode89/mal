@@ -1,75 +1,11 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
-            [mal.test.utils :refer [is-list?
-                                    is-vector?
-                                    mock-eval-context
-                                    sample-eval-context]])
+            [mal.test.utils :refer [is-list? is-vector? mock-eval-context
+                                    sample-eval-context sym$ kw$ quote$ qq$
+                                    unq$ spunq$ def$ let$ if$ fn$ defmacro$
+                                    do$ cons$ concat$ try$ throw$]])
   (:import [mal.types Function Keyword Namespace]))
-
-(defn sym$ [name]
-  (assert (string? name))
-  (core/symbol name))
-
-(defn kw$ [name]
-  (assert (string? name))
-  (core/keyword name))
-
-(defn quote$ [form]
-  (list (sym$ "quote") form))
-
-(defn qq$ [form]
-  (list (sym$ "quasiquote") form))
-
-(defn unq$ [form]
-  (list (sym$ "unquote") form))
-
-(defn spunq$ [form]
-  (list (sym$ "splice-unquote") form))
-
-(defn def$ [name value]
-  (assert (string? name))
-  (list (sym$ "def!") (sym$ name) value))
-
-(defn let$ [bindings body]
-  (list (sym$ "let*") bindings body))
-
-(defn if$
-  ([pred then]
-    (list (sym$ "if") pred then))
-  ([pred then else]
-    (list (sym$ "if") pred then else)))
-
-(defn fn$
-  ([params]
-    (list (sym$ "fn*") params))
-  ([params body]
-    (list (sym$ "fn*") params body)))
-
-(defn defmacro$ [name value]
-  (assert (string? name))
-  (list (sym$ "defmacro!") (sym$ name) value))
-
-(defn do$ [& forms]
-  (apply list (concat [(sym$ "do")] forms)))
-
-(defn cons$ [x xs]
-  (list (sym$ "cons") x xs))
-
-(defn concat$ [& xs]
-  (apply list (concat [(sym$ "concat")] xs)))
-
-(defn try$
-  ([expr]
-    (list (sym$ "try*") expr))
-  ([expr ex catch-expr]
-    (assert (string? ex))
-    (list (sym$ "try*") expr
-      (list (sym$ "catch*") (sym$ ex)
-        catch-expr))))
-
-(defn throw$ [obj]
-  (list (sym$ "throw*") obj))
 
 (def common-bindings
   {(core/symbol "+") +
