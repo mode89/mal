@@ -317,3 +317,10 @@
                  :locals #{"baz" "qux"})
                (sym$ "fred"))
           (catch Exception e (core/object-exception-unwrap e))))))
+
+(deftest transform
+  (let [ctx (mock-compile-context)]
+    (is (= [[:expr "42"] [:block] ctx] (c/transform ctx 42)))
+    (is (= [[:expr "\"42\""] [:block] ctx] (c/transform ctx "42"))))
+  (let [ctx (mock-compile-context :locals #{"foo"})]
+    (is (= [[:expr "foo"] [:block] ctx] (c/transform ctx (sym$ "foo"))))))

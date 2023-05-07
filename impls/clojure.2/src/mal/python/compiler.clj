@@ -205,3 +205,17 @@
           (throw-not-found sym)))
     :else
       (throw-not-found sym)))
+
+(defn transform
+  "Transform lisp AST into python AST"
+  [ctx form]
+  {:pre [(instance? CompileContext ctx)]
+   :post [(= :expr (first (first %)))
+          (vector? (second %))
+          (= :block (first (second %)))
+          (instance? CompileContext (nth % 2))]}
+  (cond
+    (core/symbol? form)
+      [[:expr (resolve-symbol-name ctx form)] [:block] ctx]
+    :else
+      [[:expr (pr-str form)] [:block] ctx]))
