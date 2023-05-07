@@ -1,5 +1,8 @@
 (ns mal.python.compiler
-  (:require [clojure.string :refer [join triml]]))
+  (:require [clojure.string :refer [join triml]]
+            [mal.core :as core]))
+
+(defrecord CompileContext [ns-registry current-ns locals])
 
 (defmacro assert-symbol [s]
   `(let [s# ~s]
@@ -169,3 +172,36 @@
                     excepts)
                (when (some? finally)
                  (emit finally)))))))
+
+(defn- throw-not-found [sym]
+  (core/throw
+    (str "'"
+         (when-some [namespace (:namespace sym)]
+           (str namespace "/"))
+         (:name sym)
+         "' not found")))
+
+(defn resolve-symbol-name [ctx sym]
+  (assert (core/symbol? sym) "must be a symbol")
+  (assert (set? (:locals ctx)) "locals must be a set")
+  (cond
+    (some? (:namespace sym))
+      (let [sym-ns-name (:namespace sym)]
+        (if-some [sym-ns (get (-> ctx :ns-registry core/deref)
+                              (core/symbol sym-ns-name))]
+          (let [bindings (-> sym-ns :bindings core/deref)
+                sym-name (:name sym)
+                simp-sym (core/symbol sym-name)]
+            (if (contains? bindings simp-sym)
+              (str sym-ns-name "." sym-name)
+              (throw-not-found sym)))
+          (core/throw (str "namespace '" sym-ns-name "' not found"))))
+    (contains? (:locals ctx) sym)
+      (:name sym)
+    (some? (:current-ns ctx))
+      (let [bindings (-> ctx :current-ns :bindings core/deref)]
+        (if (contains? bindings sym)
+          (:name sym)
+          (throw-not-found sym)))
+    :else
+      (throw-not-found sym)))
