@@ -173,6 +173,13 @@
                (when (some? finally)
                  (emit finally)))))))
 
+(defn mangle [sym]
+  (assert (core/symbol? sym) "must be a symbol")
+  (str
+    (when-some [ns (:namespace sym)]
+      (str ns "."))
+    (:name sym)))
+
 (defn- throw-not-found [sym]
   (core/throw
     (str "'"
@@ -194,18 +201,18 @@
                 simp-sym (core/symbol sym-name)]
             (assert (set? bindings) "namespace bindings must be a set")
             (if (contains? bindings simp-sym)
-              (str sym-ns-name "." sym-name)
+              (mangle sym)
               (throw-not-found sym)))
           (core/throw (str "namespace '" sym-ns-name "' not found"))))
     (contains? (:locals ctx) sym)
-      (:name sym)
+      (mangle sym)
     (some? (:current-ns-name ctx))
       (let [current-ns (get (:ns-registry ctx) (:current-ns-name ctx))
             bindings (:bindings current-ns)]
         (assert (some? current-ns) "current namespace not found")
         (assert (set? bindings) "namespace bindings must be a set")
         (if (contains? bindings sym)
-          (:name sym)
+          (mangle sym)
           (throw-not-found sym)))
     :else
       (throw-not-found sym)))

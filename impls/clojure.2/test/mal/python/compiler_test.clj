@@ -267,6 +267,13 @@
           "  l = m"
           "  return n"])))
 
+(deftest mangle
+  (is (= "foo" (c/mangle (sym$ "foo"))))
+  (is (= "foo.bar.baz" (c/mangle (sym$ "foo.bar/baz"))))
+  (is (re-find #"must be a symbol"
+        (try (c/mangle "foo")
+          (catch Error e (.getMessage e))))))
+
 (deftest resolve-symbol-name
   (is (= "foo" (c/resolve-symbol-name
                  (mock-compile-context :locals #{"foo"})
