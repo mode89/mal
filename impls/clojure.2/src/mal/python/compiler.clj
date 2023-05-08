@@ -2,7 +2,7 @@
   (:require [clojure.string :refer [join triml]]
             [mal.core :as core]))
 
-(defrecord CompileContext [ns-registry current-ns-name locals])
+(defrecord CompileContext [ns-registry current-ns locals])
 
 (defmacro assert-symbol [s]
   `(let [s# ~s]
@@ -206,8 +206,8 @@
           (core/throw (str "namespace '" sym-ns-name "' not found"))))
     (contains? (:locals ctx) sym)
       (mangle sym)
-    (some? (:current-ns-name ctx))
-      (let [current-ns (get (:ns-registry ctx) (:current-ns-name ctx))
+    (some? (:current-ns ctx))
+      (let [current-ns (get (:ns-registry ctx) (:current-ns ctx))
             bindings (:bindings current-ns)]
         (assert (some? current-ns) "current namespace not found")
         (assert (set? bindings) "namespace bindings must be a set")
