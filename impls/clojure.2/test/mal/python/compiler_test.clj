@@ -2,18 +2,23 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [mock-ns sym$]]))
+            [mal.test.utils :refer [sym$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry current-ns locals]}]
   (assert (or (nil? locals) (set? locals)))
   (let [registry (into {}
                    (map (fn [[name bindings]]
-                          [(core/symbol name) (mock-ns name bindings)])
+                          (assert (set? bindings))
+                          [(core/symbol name)
+                           {:name name
+                            :bindings (into #{}
+                                        (map core/symbol bindings))}])
                         ns-registry))]
     (c/->CompileContext
-      (core/atom registry)
+      registry
       (when (some? current-ns)
-        (get registry (core/symbol current-ns)))
+        (assert (contains? ns-registry current-ns))
+        (core/symbol current-ns))
       (into #{} (map core/symbol locals)))))
 
 (deftest emit-assign
@@ -268,13 +273,13 @@
                  (sym$ "foo"))))
   (is (= "bar" (c/resolve-symbol-name
                  (mock-compile-context
-                   :ns-registry {"foo" {(sym$ "bar") 42}}
+                   :ns-registry {"foo" #{"bar"}}
                    :current-ns "foo")
                  (sym$ "bar"))))
   (is (= "baz.qux" (c/resolve-symbol-name
                      (mock-compile-context
-                       :ns-registry {"foo" {(sym$ "bar") 42}
-                                     "baz" {(sym$ "qux") 43}}
+                       :ns-registry {"foo" #{"bar"}
+                                     "baz" #{"qux"}}
                        :current-ns "foo")
                      (sym$ "baz/qux"))))
   (is (re-find #"must be a symbol"
@@ -290,33 +295,58 @@
   (is (re-find #"'bar' not found"
         (try (c/resolve-symbol-name
                (mock-compile-context
-                 :ns-registry {"foo" {(sym$ "baz") 42}}
+                 :ns-registry {"foo" #{"baz"}}
                  :current-ns "foo")
                (sym$ "bar"))
           (catch Exception e (core/object-exception-unwrap e)))))
   (is (re-find #"'baz/bar' not found"
         (try (c/resolve-symbol-name
                (mock-compile-context
-                 :ns-registry {"foo" {(sym$ "bar") 42}
-                               "baz" {(sym$ "qux") 43}}
+                 :ns-registry {"foo" #{"bar"}
+                               "baz" #{"qux"}}
                  :current-ns "foo")
                (sym$ "baz/bar"))
           (catch Exception e (core/object-exception-unwrap e)))))
   (is (re-find #"namespace 'baz' not found"
         (try (c/resolve-symbol-name
                (mock-compile-context
-                 :ns-registry {"foo" {(sym$ "bar") 42}}
+                 :ns-registry {"foo" #{"bar"}}
                  :current-ns "foo")
                (sym$ "baz/bar"))
           (catch Exception e (core/object-exception-unwrap e)))))
   (is (re-find #"'fred' not found"
         (try (c/resolve-symbol-name
                (mock-compile-context
-                 :ns-registry {"foo" {(sym$ "bar") 42}}
+                 :ns-registry {"foo" #{"bar"}}
                  :current-ns nil
                  :locals #{"baz" "qux"})
                (sym$ "fred"))
-          (catch Exception e (core/object-exception-unwrap e))))))
+          (catch Exception e (core/object-exception-unwrap e)))))
+  (is (re-find #"namespace bindings must be a set"
+        (try (c/resolve-symbol-name
+               (c/->CompileContext
+                 {(sym$ "foo") [(sym$ "bar")]}
+                 (sym$ "foo")
+                 #{})
+               (sym$ "bar"))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"namespace bindings must be a set"
+        (try (c/resolve-symbol-name
+               (c/->CompileContext
+                 {(sym$ "foo") #{}
+                  (sym$ "bar") [(sym$ "baz")]}
+                 (sym$ "foo")
+                 #{})
+               (sym$ "bar/baz"))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"current namespace not found"
+        (try (c/resolve-symbol-name
+               (c/->CompileContext
+                 {(sym$ "foo") #{(sym$ "bar")}}
+                 (sym$ "baz")
+                 #{})
+               (sym$ "bar"))
+          (catch Error e (.getMessage e))))))
 
 (deftest transform
   (let [ctx (mock-compile-context)]
