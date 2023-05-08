@@ -2,9 +2,12 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [def$ sym$]]))
+            [mal.test.utils :refer [def$ do$ sym$]]))
 
-(defn mock-compile-context [& {:keys [ns-registry current-ns locals]}]
+(defn mock-compile-context [& {:keys [ns-registry
+                                      current-ns
+                                      locals
+                                      counter]}]
   (assert (or (nil? locals) (set? locals)))
   (let [registry (into {}
                    (map (fn [[name bindings]]
@@ -14,12 +17,13 @@
                             :bindings (into #{}
                                         (map core/symbol bindings))}])
                         ns-registry))]
-    (c/->CompileContext
-      registry
-      (when (some? current-ns)
-        (assert (contains? ns-registry current-ns))
-        (core/symbol current-ns))
-      (into #{} (map core/symbol locals)))))
+    (c/map->CompileContext
+      {:ns-registry registry
+       :current-ns (when (some? current-ns)
+                     (assert (contains? ns-registry current-ns))
+                     (core/symbol current-ns))
+       :locals (into #{} (map core/symbol locals))
+       :counter (if (some? counter) counter 0)})))
 
 (deftest emit-assign
   (is (= (c/emit-assign "a" "b") ["a = b"])))
@@ -296,7 +300,11 @@
           (catch Error e (.getMessage e)))))
   (is (re-find #"locals must be a set"
         (try (c/resolve-symbol-name
-               (c/->CompileContext nil nil ["foo"])
+               (c/map->CompileContext
+                 {:ns-registry nil
+                  :current-ns nil
+                  :locals ["foo"]
+                  :counter 0})
                (sym$ "foo"))
           (catch Error e (.getMessage e)))))
   (is (re-find #"'bar' not found"
@@ -331,44 +339,46 @@
           (catch Exception e (core/object-exception-unwrap e)))))
   (is (re-find #"namespace bindings must be a set"
         (try (c/resolve-symbol-name
-               (c/->CompileContext
-                 {(sym$ "foo") [(sym$ "bar")]}
-                 (sym$ "foo")
-                 #{})
+               (c/map->CompileContext
+                 {:ns-registry {(sym$ "foo") [(sym$ "bar")]}
+                  :current-ns (sym$ "foo")
+                  :locals #{}
+                  :counter 0})
                (sym$ "bar"))
           (catch Error e (.getMessage e)))))
   (is (re-find #"namespace bindings must be a set"
         (try (c/resolve-symbol-name
-               (c/->CompileContext
-                 {(sym$ "foo") #{}
-                  (sym$ "bar") [(sym$ "baz")]}
-                 (sym$ "foo")
-                 #{})
+               (c/map->CompileContext
+                 {:ns-registry {(sym$ "foo") #{}
+                                (sym$ "bar") [(sym$ "baz")]}
+                  :current-ns (sym$ "foo")
+                  :locals #{}
+                  :counter 0})
                (sym$ "bar/baz"))
           (catch Error e (.getMessage e)))))
   (is (re-find #"current namespace not found"
         (try (c/resolve-symbol-name
-               (c/->CompileContext
-                 {(sym$ "foo") #{(sym$ "bar")}}
-                 (sym$ "baz")
-                 #{})
+               (c/map->CompileContext
+                 {:ns-registry {(sym$ "foo") #{(sym$ "bar")}}
+                  :current-ns (sym$ "baz")
+                  :locals #{}
+                  :counter 0})
                (sym$ "bar"))
           (catch Error e (.getMessage e))))))
 
 (deftest transform
   (let [ctx (mock-compile-context)]
-    (is (= [[:expr "42"] [:block] ctx] (c/transform ctx 42)))
-    (is (= [[:expr "\"42\""] [:block] ctx] (c/transform ctx "42"))))
+    (is (= [[:expr "42"] nil ctx] (c/transform ctx 42)))
+    (is (= [[:expr "\"42\""] nil ctx] (c/transform ctx "42"))))
   (let [ctx (mock-compile-context :locals #{"foo"})]
-    (is (= [[:expr "foo"] [:block] ctx] (c/transform ctx (sym$ "foo"))))))
+    (is (= [[:expr "foo"] nil ctx] (c/transform ctx (sym$ "foo"))))))
 
 (deftest transform-def
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
     (is (= [[:expr "bar"]
-            [:block
-              [:assign "globals()[bar]" [:expr "42"]]]
+            [[:assign (c/globals "bar") [:expr "42"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo")]
@@ -400,3 +410,30 @@
                  :ns-registry {"foo" #{}})
                (def$ "bar" 42))
           (catch Error e (.getMessage e))))))
+
+(deftest transform-do
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{}}
+              :current-ns "foo")
+        temp0 (c/temp-name 0)]
+    (is (= [[:expr "None"] nil ctx] (c/transform ctx (do$))))
+    (is (= [[:expr temp0]
+            [[:assign (c/globals "bar") [:expr "42"]]
+             [:assign temp0 [:expr "bar"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar"}}
+              :current-ns "foo"
+              :counter 1)]
+           (c/transform ctx (do$ (def$ "bar" 42)))))
+    (is (= [[:expr temp0]
+            [[:assign (c/globals "bar") [:expr "42"]]
+             [:expr "bar"]
+             [:assign (c/globals "baz") [:expr "43"]]
+             [:assign temp0 [:expr "baz"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar" "baz"}}
+              :current-ns "foo"
+              :counter 1)]
+           (c/transform ctx
+             (do$ (def$ "bar" 42)
+                  (def$ "baz" 43)))))))

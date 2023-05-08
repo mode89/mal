@@ -2,7 +2,7 @@
   (:require [clojure.string :refer [join triml]]
             [mal.core :as core]))
 
-(defrecord CompileContext [ns-registry current-ns locals])
+(defrecord CompileContext [ns-registry current-ns locals counter])
 
 (defmacro assert-symbol [s]
   `(let [s# ~s]
@@ -180,6 +180,18 @@
       (str ns "."))
     (:name sym)))
 
+(defn temp-name [counter]
+  (assert (int? counter) "counter must be an integer")
+  (str "___temp_" counter))
+
+(defn gen-temp-name [ctx]
+  [(temp-name (:counter ctx))
+   (update ctx :counter inc)])
+
+(defn globals [name]
+  (assert (string? name))
+  (str "globals()[\"" name "\"]"))
+
 (defn- throw-not-found [sym]
   (core/throw
     (str "'"
@@ -222,13 +234,11 @@
   [ctx form]
   {:pre [(instance? CompileContext ctx)]
    :post [(= :expr (first (first %)))
-          (vector? (second %))
-          (= :block (first (second %)))
           (instance? CompileContext (nth % 2))]}
   (cond
     (list? form)
       (if (empty? form)
-        [[:expr "list()"] [:block] ctx]
+        [[:expr "list()"] nil ctx]
         (let [head (first form)
               args (rest form)]
           (condp = head
@@ -242,12 +252,33 @@
                       current-ns (:current-ns ctx)]
                   (assert (some? current-ns) "no current namespace")
                   [[:expr (mangle name)]
-                   (conj val-body
-                     [:assign (str "globals()[" (mangle name) "]") val-expr])
+                   (conj val-body [:assign (globals (mangle name)) val-expr])
                    (update-in ctx2
                      [:ns-registry current-ns :bindings]
-                     conj name)])))))
+                     conj name)]))
+            (core/symbol "do")
+              (if (empty? args)
+                [[:expr "None"] nil ctx]
+                (loop [args args
+                       body nil
+                       ctx ctx]
+                  (let [[res res-body ctx2] (transform ctx (first args))]
+                    (if (= 1 (count args))
+                      (let [[temp ctx3] (gen-temp-name ctx2)]
+                        [[:expr temp]
+                         (concat
+                           body
+                           res-body
+                           [[:assign temp res]])
+                         ctx3])
+                      (recur
+                        (rest args)
+                        (concat
+                          body
+                          res-body
+                          [res])
+                        ctx2))))))))
     (core/symbol? form)
-      [[:expr (resolve-symbol-name ctx form)] [:block] ctx]
+      [[:expr (resolve-symbol-name ctx form)] nil ctx]
     :else
-      [[:expr (pr-str form)] [:block] ctx]))
+      [[:expr (pr-str form)] nil ctx]))
