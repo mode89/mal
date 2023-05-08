@@ -9,12 +9,16 @@
    :step7_quote {:main-opts ["--main" "mal.s7"]}
    :step8_macros {:main-opts ["--main" "mal.s8"]}
    :step9_try {:main-opts ["--main" "mal.s9"]}
-   :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.7"}}
-           :main-opts ["-m" "nrepl.cmdline" "--middleware"
-                       "[cider.nrepl/cider-middleware]"]}
+   :nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.28.7"}
+                        eftest/eftest {:mvn/version "0.6.0"}}
+           :extra-paths ["test"]
+           :main-opts ["--main" "nrepl.cmdline"
+                       "--middleware" "[cider.nrepl/cider-middleware]"
+                       "--port" "5555"]}
    :repl {:extra-deps {reply/reply {:mvn/version "0.5.1"}}
           :extra-paths ["test"]
-          :main-opts ["--main" "reply.main"]}
+          :main-opts ["--main" "reply.main"
+                      "--attach" "5555"]}
    :cover {:extra-paths ["test"]
            :extra-deps {cloverage/cloverage {:mvn/version "1.2.4"}
                         eftest/eftest {:mvn/version "0.6.0"}}
