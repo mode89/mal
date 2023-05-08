@@ -245,8 +245,8 @@
                    (conj val-body
                      [:assign (str "globals()[" (mangle name) "]") val-expr])
                    (update-in ctx2
-                      [:ns-registry current-ns :bindings]
-                      conj name)])))))
+                     [:ns-registry current-ns :bindings]
+                     conj name)])))))
     (core/symbol? form)
       [[:expr (resolve-symbol-name ctx form)] [:block] ctx]
     :else
