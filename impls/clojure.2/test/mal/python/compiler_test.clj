@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [sym$]]))
+            [mal.test.utils :refer [def$ sym$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry current-ns locals]}]
   (assert (or (nil? locals) (set? locals)))
@@ -361,3 +361,42 @@
     (is (= [[:expr "\"42\""] [:block] ctx] (c/transform ctx "42"))))
   (let [ctx (mock-compile-context :locals #{"foo"})]
     (is (= [[:expr "foo"] [:block] ctx] (c/transform ctx (sym$ "foo"))))))
+
+(deftest transform-def
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{}}
+              :current-ns "foo")]
+    (is (= [[:expr "bar"]
+            [:block
+              [:assign "globals()[bar]" [:expr "42"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar"}}
+              :current-ns "foo")]
+           (c/transform ctx (def$ "bar" 42)))))
+  (is (re-find #"def! expects a symbol as the first argument"
+        (try (c/transform
+               (mock-compile-context
+                 :ns-registry {"foo" #{}}
+                 :current-ns "foo")
+               (list (sym$ "def!") "bar" 42))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"def! expects 2 arguments"
+        (try (c/transform
+               (mock-compile-context
+                 :ns-registry {"foo" #{}}
+                 :current-ns "foo")
+               (list (sym$ "def!") (sym$ "bar")))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"def! expects 2 arguments"
+        (try (c/transform
+               (mock-compile-context
+                 :ns-registry {"foo" #{}}
+                 :current-ns "foo")
+               (list (sym$ "def!") (sym$ "bar") 42 43))
+          (catch Error e (.getMessage e)))))
+  (is (re-find #"no current namespace"
+        (try (c/transform
+               (mock-compile-context
+                 :ns-registry {"foo" #{}})
+               (def$ "bar" 42))
+          (catch Error e (.getMessage e))))))

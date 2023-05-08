@@ -226,6 +226,27 @@
           (= :block (first (second %)))
           (instance? CompileContext (nth % 2))]}
   (cond
+    (list? form)
+      (if (empty? form)
+        [[:expr "list()"] [:block] ctx]
+        (let [head (first form)
+              args (rest form)]
+          (condp = head
+            (core/symbol "def!")
+              (let [name (first args)
+                    value-form (second args)]
+                (assert (core/symbol? name)
+                        "def! expects a symbol as the first argument")
+                (assert (= (count args) 2) "def! expects 2 arguments")
+                (let [[val-expr val-body ctx2] (transform ctx value-form)
+                      current-ns (:current-ns ctx)]
+                  (assert (some? current-ns) "no current namespace")
+                  [[:expr (mangle name)]
+                   (conj val-body
+                     [:assign (str "globals()[" (mangle name) "]") val-expr])
+                   (update-in ctx2
+                      [:ns-registry current-ns :bindings]
+                      conj name)])))))
     (core/symbol? form)
       [[:expr (resolve-symbol-name ctx form)] [:block] ctx]
     :else
