@@ -326,5 +326,7 @@
       [[:value (resolve-symbol-name ctx form)] nil ctx]
     (nil? form)
       [[:value "None"] nil ctx]
+    (boolean? form)
+      [[:value (if form "True" "False")] nil ctx]
     :else
       [[:value (pr-str form)] nil ctx]))
