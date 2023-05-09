@@ -136,57 +136,57 @@
           "  g"])))
 
 (deftest emit
-  (is (= (c/emit [:assign "a" [:expr "b"]]) ["a = b"]))
-  (is (= (c/emit [:call "foo" [[:expr "a"] [:expr "b"]]
-                              {"c" [:expr "42"]}])
+  (is (= (c/emit [:assign "a" [:value "b"]]) ["a = b"]))
+  (is (= (c/emit [:call "foo" [[:value "a"] [:value "b"]]
+                              {"c" [:value "42"]}])
          ["foo(a, b, c=42)"]))
   (is (= (c/emit [:block
-                   [:assign "a" [:expr "b"]]
-                   [:call "foo" [[:expr "a"] [:expr "b"]]
-                                {"c" [:expr "42"]}]])
+                   [:assign "a" [:value "b"]]
+                   [:call "foo" [[:value "a"] [:value "b"]]
+                                {"c" [:value "42"]}]])
          ["a = b"
           "foo(a, b, c=42)"]))
   (is (= (c/emit [:block
                    [:block
-                     [:assign "a" [:expr "b"]]
-                     [:assign "c" [:expr "d"]]]
+                     [:assign "a" [:value "b"]]
+                     [:assign "c" [:value "d"]]]
                    [:block
-                     [:assign "e" [:expr "f"]]
-                     [:assign "g" [:expr "h"]]]])
+                     [:assign "e" [:value "f"]]
+                     [:assign "g" [:value "h"]]]])
          ["a = b"
           "c = d"
           "e = f"
           "g = h"]))
-  (is (= (c/emit [:if [:expr "a"]
+  (is (= (c/emit [:if [:value "a"]
                    [:block
-                     [:assign "b" [:expr "c"]]] nil nil])
+                     [:assign "b" [:value "c"]]] nil nil])
          ["if a:" "  b = c"]))
-  (is (= (c/emit [:if [:expr "a"]
+  (is (= (c/emit [:if [:value "a"]
                    [:block
-                     [:assign "b" [:expr "c"]]]
+                     [:assign "b" [:value "c"]]]
                    nil
                    [:block
-                     [:assign "d" [:expr "e"]]]])
+                     [:assign "d" [:value "e"]]]])
          ["if a:"
           "  b = c"
           "else:"
           "  d = e"]))
-  (is (= (c/emit [:if [:expr "cond1"]
+  (is (= (c/emit [:if [:value "cond1"]
                    [:block
-                     [:assign "a" [:expr "b"]]
-                     [:call "foo" [[:expr "a"] [:expr "b"]] {}]]
-                   [[[:expr "cond2"]
+                     [:assign "a" [:value "b"]]
+                     [:call "foo" [[:value "a"] [:value "b"]] {}]]
+                   [[[:value "cond2"]
                        [:block
-                         [:assign "f" [:expr "g"]]
-                         [:assign "h" [:expr "i"]]]]
-                    [[:expr "cond3"]
+                         [:assign "f" [:value "g"]]
+                         [:assign "h" [:value "i"]]]]
+                    [[:value "cond3"]
                        [:block
-                         [:call "baz" [[:expr "j"] [:expr "k"]] {}]
-                         [:assign "l" [:expr "m"]]]]]
+                         [:call "baz" [[:value "j"] [:value "k"]] {}]
+                         [:assign "l" [:value "m"]]]]]
                    [:block
-                     [:call "bar" [[:expr "x"] [:expr "y"]]
-                                  {"z" [:expr "42"]}]
-                     [:assign "p" [:expr "q"]]]])
+                     [:call "bar" [[:value "x"] [:value "y"]]
+                                  {"z" [:value "42"]}]
+                     [:assign "p" [:value "q"]]]])
          ["if cond1:"
           "  a = b"
           "  foo(a, b)"
@@ -199,16 +199,16 @@
           "else:"
           "  bar(x, y, z=42)"
           "  p = q"]))
-  (is (= (c/emit [:while [:expr "a"]
+  (is (= (c/emit [:while [:value "a"]
                    [:block
-                     [:assign "b" [:expr "c"]]]])
+                     [:assign "b" [:value "c"]]]])
          ["while a:" "  b = c"]))
-  (is (= (c/emit [:while [:expr "a"]
+  (is (= (c/emit [:while [:value "a"]
                    [:block
-                     [:assign "b" [:expr "c"]]
-                     [:if [:expr [:call "foo"
-                                   [[:expr "a"] [:expr "b"]]
-                                   {"c" [:expr "42"]}]]
+                     [:assign "b" [:value "c"]]
+                     [:if [:call "foo"
+                            [[:value "a"] [:value "b"]]
+                            {"c" [:value "42"]}]
                        [:block
                          [:break]]
                        nil
@@ -222,40 +222,40 @@
           "    continue"]))
   (is (= (c/emit [:def "foo" ["a" "b"]
                    [:block
-                     [:assign "c" [:expr "d"]]
-                     [:return [:expr "e"]]]])
+                     [:assign "c" [:value "d"]]
+                     [:return [:value "e"]]]])
          ["def foo(a, b):"
           "  c = d"
           "  return e"]))
   (is (= (c/emit [:try
                    [:block
-                     [:assign "a" [:expr "b"]]]
+                     [:assign "a" [:value "b"]]]
                    nil
                    [:block
-                     [:assign "c" [:expr "d"]]]])
+                     [:assign "c" [:value "d"]]]])
          ["try:"
           "  a = b"
           "finally:"
           "  c = d"]))
   (is (= (c/emit [:try
                    [:block
-                     [:assign "a" [:expr "b"]]
-                     [:call "foo" [[:expr "a"] [:expr "b"]]
-                                  {"c" [:expr "42"]}]]
+                     [:assign "a" [:value "b"]]
+                     [:call "foo" [[:value "a"] [:value "b"]]
+                                  {"c" [:value "42"]}]]
                    [["Exception" nil
                       [:block
-                        [:assign "d" [:expr "e"]]
-                        [:return [:expr "f"]]]]
+                        [:assign "d" [:value "e"]]
+                        [:return [:value "f"]]]]
                     ["ValueError" "e"
                       [:block
-                        [:assign "g" [:expr "h"]]
-                        [:return [:expr "i"]]]]
+                        [:assign "g" [:value "h"]]
+                        [:return [:value "i"]]]]
                     ["TypeError" "e"
                       [:block
-                        [:assign "j" [:expr "k"]]]]]
+                        [:assign "j" [:value "k"]]]]]
                    [:block
-                     [:assign "l" [:expr "m"]]
-                     [:return [:expr "n"]]]])
+                     [:assign "l" [:value "m"]]
+                     [:return [:value "n"]]]])
          ["try:"
           "  a = b"
           "  foo(a, b, c=42)"
@@ -368,18 +368,18 @@
 
 (deftest transform
   (let [ctx (mock-compile-context)]
-    (is (= [[:expr "42"] nil ctx] (c/transform ctx 42)))
-    (is (= [[:expr "\"42\""] nil ctx] (c/transform ctx "42")))
-    (is (= [[:expr "None"] nil ctx] (c/transform ctx nil))))
+    (is (= [[:value "42"] nil ctx] (c/transform ctx 42)))
+    (is (= [[:value "\"42\""] nil ctx] (c/transform ctx "42")))
+    (is (= [[:value "None"] nil ctx] (c/transform ctx nil))))
   (let [ctx (mock-compile-context :locals #{"foo"})]
-    (is (= [[:expr "foo"] nil ctx] (c/transform ctx (sym$ "foo"))))))
+    (is (= [[:value "foo"] nil ctx] (c/transform ctx (sym$ "foo"))))))
 
 (deftest transform-def
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
-    (is (= [[:expr "bar"]
-            [[:assign (c/globals "bar") [:expr "42"]]]
+    (is (= [[:value "bar"]
+            [[:assign (c/globals "bar") [:value "42"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo")]
@@ -417,20 +417,20 @@
               :ns-registry {"foo" #{}}
               :current-ns "foo")
         temp0 (c/temp-name 0)]
-    (is (= [[:expr "None"] nil ctx] (c/transform ctx (do$))))
-    (is (= [[:expr temp0]
-            [[:assign (c/globals "bar") [:expr "42"]]
-             [:assign temp0 [:expr "bar"]]]
+    (is (= [[:value "None"] nil ctx] (c/transform ctx (do$))))
+    (is (= [[:value temp0]
+            [[:assign (c/globals "bar") [:value "42"]]
+             [:assign temp0 [:value "bar"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo"
               :counter 1)]
            (c/transform ctx (do$ (def$ "bar" 42)))))
-    (is (= [[:expr temp0]
-            [[:assign (c/globals "bar") [:expr "42"]]
-             [:expr "bar"]
-             [:assign (c/globals "baz") [:expr "43"]]
-             [:assign temp0 [:expr "baz"]]]
+    (is (= [[:value temp0]
+            [[:assign (c/globals "bar") [:value "42"]]
+             [:value "bar"]
+             [:assign (c/globals "baz") [:value "43"]]
+             [:assign temp0 [:value "baz"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar" "baz"}}
               :current-ns "foo"

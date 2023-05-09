@@ -25,6 +25,11 @@
 (defn indent-lines1 [lines]
   (indent-lines lines "  "))
 
+(defn expression? [ast]
+  (let [tag (first ast)]
+    (or (= :value tag)
+        (= :call tag))))
+
 (defn emit-assign [name value]
   (assert-symbol name)
   (assert-line value)
@@ -115,36 +120,33 @@
     (case tag
       ; Assign an expression to a variable
       :assign (let [[name value] (rest ast)]
-                (assert (= :expr (first value)))
+                (assert (expression? value))
                 (emit-assign name (first (emit value))))
       :call (let [[name args kwargs] (rest ast)]
               (emit-call name
                 (map (fn [arg]
-                       (assert (= :expr (first arg)))
+                       (assert (expression? arg))
                        (first (emit arg)))
                      args)
                 (into {}
                   (map (fn [[k v]]
-                         (assert (= :expr (first v)))
+                         (assert (expression? v))
                          [k (first (emit v))]))
                     kwargs)))
-      ; Either a string literal or a call expression
-      :expr (let [expr (second ast)]
-              (cond
-                (string? expr) [expr]
-                (= :call (first expr)) (emit expr)
-                :else (throw (ex-info "Invalid expression" {:expr expr}))))
+      :value (let [value (second ast)]
+               (assert (string? value))
+               [value])
       ; A list of statements. Can't be empty.
       :block (let [statements (rest ast)]
                (assert (seq statements))
                (mapcat emit statements))
       :if (let [[condition then elifs else] (rest ast)]
-            (assert (= :expr (first condition)))
+            (assert (expression? condition))
             (assert (= :block (first then)))
             (emit-if (first (emit condition))
               (emit then)
               (map (fn [[condition body]]
-                     (assert (= :expr (first condition)))
+                     (assert (expression? condition))
                      (assert (= :block (first body)))
                      [(first (emit condition)) (emit body)])
                    elifs)
@@ -152,7 +154,7 @@
                 (assert (= :block (first else)))
                 (emit else))))
       :while (let [[condition body] (rest ast)]
-               (assert (= :expr (first condition)))
+               (assert (expression? condition))
                (assert (= :block (first body)))
                (emit-while (first (emit condition)) (emit body)))
       :break (emit-break)
@@ -161,7 +163,7 @@
              (assert (= :block (first body)))
              (emit-def name params (emit body)))
       :return (let [value (second ast)]
-                (assert (= :expr (first value)))
+                (assert (expression? value))
                 (emit-return (first (emit value))))
       :try (let [[body excepts finally] (rest ast)]
              (assert (= :block (first body)))
@@ -233,12 +235,12 @@
   "Transform lisp AST into python AST"
   [ctx form]
   {:pre [(instance? CompileContext ctx)]
-   :post [(= :expr (first (first %)))
+   :post [(expression? (first %))
           (instance? CompileContext (nth % 2))]}
   (cond
     (list? form)
       (if (empty? form)
-        [[:expr "list()"] nil ctx]
+        [[:value "list()"] nil ctx]
         (let [head (first form)
               args (rest form)]
           (condp = head
@@ -251,21 +253,21 @@
                 (let [[val-expr val-body ctx2] (transform ctx value-form)
                       current-ns (:current-ns ctx)]
                   (assert (some? current-ns) "no current namespace")
-                  [[:expr (mangle name)]
+                  [[:value (mangle name)]
                    (conj val-body [:assign (globals (mangle name)) val-expr])
                    (update-in ctx2
                      [:ns-registry current-ns :bindings]
                      conj name)]))
             (core/symbol "do")
               (if (empty? args)
-                [[:expr "None"] nil ctx]
+                [[:value "None"] nil ctx]
                 (loop [args args
                        body nil
                        ctx ctx]
                   (let [[res res-body ctx2] (transform ctx (first args))]
                     (if (= 1 (count args))
                       (let [[temp ctx3] (gen-temp-name ctx2)]
-                        [[:expr temp]
+                        [[:value temp]
                          (concat
                            body
                            res-body
@@ -279,8 +281,8 @@
                           [res])
                         ctx2))))))))
     (core/symbol? form)
-      [[:expr (resolve-symbol-name ctx form)] nil ctx]
+      [[:value (resolve-symbol-name ctx form)] nil ctx]
     (nil? form)
-      [[:expr "None"] nil ctx]
+      [[:value "None"] nil ctx]
     :else
-      [[:expr (pr-str form)] nil ctx]))
+      [[:value (pr-str form)] nil ctx]))
