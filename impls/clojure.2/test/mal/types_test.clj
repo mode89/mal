@@ -20,6 +20,8 @@
     (is (instance? Symbol sym))
     (is (= "/" (:name sym)))
     (is (= nil (:namespace sym))))
+  (is (types/simple-symbol? (types/symbol "foo")))
+  (is (not (types/simple-symbol? (types/symbol "foo/bar"))))
   (is (types/symbol? (Symbol. nil "foo")))
   (is (thrown-with-msg? Error #"Symbol name must be a string\. Got: 42"
         (types/symbol 42))))

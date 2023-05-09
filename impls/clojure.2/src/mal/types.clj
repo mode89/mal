@@ -1,5 +1,5 @@
 (ns mal.types
-  (:refer-clojure :exclude [fn? symbol symbol?])
+  (:refer-clojure :exclude [fn? simple-symbol? symbol symbol?])
   (:require [clojure.string :refer [index-of]]))
 
 (defrecord Atom [value])
@@ -24,3 +24,7 @@
 
 (defn symbol? [x]
   (instance? Symbol x))
+
+(defn simple-symbol? [x]
+  (and (symbol? x)
+       (nil? (:namespace x))))

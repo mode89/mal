@@ -2,8 +2,8 @@
   (:refer-clojure :exclude [apply atom concat cons deref eval first fn?
                             keys keyword keyword? list? macroexpand
                             map map? nth pr-str prn println read-string
-                            reset! rest sequential? slurp str swap! symbol
-                            symbol? vals vec vector?])
+                            reset! rest sequential? slurp str swap!
+                            simple-symbol? symbol symbol? vals vec vector?])
   (:require [clojure.core :as clj]
             [clojure.string :refer [join]]
             [mal.reader :as reader]
@@ -36,6 +36,8 @@
 (def symbol types/symbol)
 
 (def symbol? types/symbol?)
+
+(def simple-symbol? types/simple-symbol?)
 
 (defn map? [x]
   (or (instance? clojure.lang.PersistentArrayMap x)
