@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [def$ do$ let$ sym$]]))
+            [mal.test.utils :refer [def$ do$ if$ let$ sym$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -520,3 +520,49 @@
                  (let$ [(sym$ "a") 42]
                    (sym$ "b")))
             (catch Exception e (core/object-exception-unwrap e)))))))
+
+(deftest transform-if
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"a" "b" "c" "d" "e" "f"}}
+              :current-ns "foo")]
+    (is (= [[:value (c/temp-name 0)]
+            [[:if [:value "True"]
+               [:block
+                 [:assign (c/temp-name 0) [:value "42"]]]
+               nil
+               [:block
+                 [:assign (c/temp-name 0) [:value "None"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx (if$ true 42))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:if [:value "False"]
+               [:block
+                 [:assign (c/temp-name 0) [:value "43"]]]
+               nil
+               [:block
+                 [:assign (c/temp-name 0) [:value "44"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx (if$ false 43 44))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:value "a"]
+             [:if [:value "b"]
+               [:block
+                 [:value "c"]
+                 [:assign (c/temp-name 0) [:value "d"]]]
+               nil
+               [:block
+                 [:value "e"]
+                 [:assign (c/temp-name 0) [:value "f"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx
+             (if$ (do$ (sym$ "a") (sym$ "b"))
+                  (do$ (sym$ "c") (sym$ "d"))
+                  (do$ (sym$ "e") (sym$ "f"))))))
+    (is (re-find #"if expects at least 2 arguments"
+          (try (c/transform ctx
+                 (list (sym$ "if") true))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"if expects at most 3 arguments"
+          (try (c/transform ctx
+                 (list (sym$ "if") true 42 43 44))
+            (catch Error e (.getMessage e)))))))
