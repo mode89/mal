@@ -308,15 +308,8 @@
                        ctx ctx]
                   (let [[res res-body ctx2] (transform ctx (first args))]
                     (if (= 1 (count args))
-                      (let [[temp ctx3] (gen-temp-name ctx2)]
-                        [[:value temp]
-                         (concat
-                           body
-                           res-body
-                           [[:assign temp res]])
-                         ctx3])
-                      (recur
-                        (rest args)
+                      [res (concat body res-body) ctx2]
+                      (recur (rest args)
                         (concat
                           body
                           res-body

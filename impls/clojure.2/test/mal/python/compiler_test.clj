@@ -417,26 +417,21 @@
 (deftest transform-do
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
-              :current-ns "foo")
-        temp0 (c/temp-name 0)]
+              :current-ns "foo")]
     (is (= [[:value "None"] nil ctx] (c/transform ctx (do$))))
-    (is (= [[:value temp0]
-            [[:assign (c/globals "bar") [:value "42"]]
-             [:assign temp0 [:value "bar"]]]
+    (is (= [[:value "bar"]
+            [[:assign (c/globals "bar") [:value "42"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
-              :current-ns "foo"
-              :counter 1)]
+              :current-ns "foo")]
            (c/transform ctx (do$ (def$ "bar" 42)))))
-    (is (= [[:value temp0]
+    (is (= [[:value "baz"]
             [[:assign (c/globals "bar") [:value "42"]]
              [:value "bar"]
-             [:assign (c/globals "baz") [:value "43"]]
-             [:assign temp0 [:value "baz"]]]
+             [:assign (c/globals "baz") [:value "43"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar" "baz"}}
-              :current-ns "foo"
-              :counter 1)]
+              :current-ns "foo")]
            (c/transform ctx
              (do$ (def$ "bar" 42)
                   (def$ "baz" 43)))))))
@@ -469,13 +464,12 @@
                  [:assign (c/globals "d") [:value "43"]]
                  [:assign "c" [:value "d"]]
                  [:value "a"]
-                 [:assign (c/temp-name 2) [:value "c"]]
-                 [:return [:value (c/temp-name 2)]]]]
+                 [:return [:value "c"]]]]
              [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
             (mock-compile-context
               :ns-registry {"foo" #{"b" "d"}}
               :current-ns "foo"
-              :counter 3)]
+              :counter 2)]
            (c/transform ctx
              (let$ [(sym$ "a") (def$ "b" 42)
                     (sym$ "c") (def$ "d" 43)]
