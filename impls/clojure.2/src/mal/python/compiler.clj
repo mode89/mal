@@ -231,6 +231,31 @@
     :else
       (throw-not-found sym)))
 
+(declare transform)
+
+(defn make-let-func [ctx bindings body]
+  (loop [bindings* bindings
+         fbody [:block]
+         ctx* ctx]
+    (if (empty? bindings*)
+      (let [[body-res body-do ctx**] (transform ctx* body)]
+        [(concat
+           fbody
+           body-do
+           [[:return body-res]])
+         ctx**])
+      (let [[name value] (first bindings*)
+            [value-res value-do ctx**] (transform ctx* value)]
+        (assert (core/simple-symbol? name)
+          "binding name must be a simple symbol")
+        (recur
+          (rest bindings*)
+          (concat
+            fbody
+            value-do
+            [[:assign (mangle name) value-res]])
+          (update ctx** :locals conj name))))))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -258,6 +283,23 @@
                    (update-in ctx2
                      [:ns-registry current-ns :bindings]
                      conj name)]))
+            (core/symbol "let*")
+              (let [bindings-spec (first args)
+                    bindings (partition 2 bindings-spec)
+                    body-form (second args)
+                    [result ctx2] (gen-temp-name ctx)
+                    [temp-func ctx3] (gen-temp-name ctx2)
+                    [temp-func-body ctx4] (make-let-func
+                                            ctx3 bindings body-form)]
+                (assert (< 0 (count args)) "no bindings provided")
+                (assert (even? (count bindings-spec))
+                        "let* expects even number of forms in bindings")
+                (assert (> 3 (count args))
+                        "let* expects only one form in body")
+                [[:value result]
+                 [[:def temp-func [] temp-func-body]
+                  [:assign result [:call temp-func nil {}]]]
+                 (assoc ctx4 :locals (:locals ctx))])
             (core/symbol "do")
               (if (empty? args)
                 [[:value "None"] nil ctx]

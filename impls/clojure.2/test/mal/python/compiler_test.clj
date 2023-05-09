@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [def$ do$ sym$]]))
+            [mal.test.utils :refer [def$ do$ let$ sym$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -438,3 +438,89 @@
            (c/transform ctx
              (do$ (def$ "bar" 42)
                   (def$ "baz" 43)))))))
+
+(deftest transform-let
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{}}
+              :current-ns "foo")]
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 1) []
+               [:block [:return [:value "None"]]]]
+             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
+            (assoc ctx :counter 2)]
+           (c/transform ctx (list (sym$ "let*") []))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 1) []
+               [:block
+                 [:assign "a" [:value "42"]]
+                 [:return [:value "a"]]]]
+             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
+            (assoc ctx :counter 2)]
+           (c/transform ctx
+             (let$ [(sym$ "a") 42]
+               (sym$ "a")))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 1) []
+               [:block
+                 [:assign (c/globals "b") [:value "42"]]
+                 [:assign "a" [:value "b"]]
+                 [:assign (c/globals "d") [:value "43"]]
+                 [:assign "c" [:value "d"]]
+                 [:value "a"]
+                 [:assign (c/temp-name 2) [:value "c"]]
+                 [:return [:value (c/temp-name 2)]]]]
+             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"b" "d"}}
+              :current-ns "foo"
+              :counter 3)]
+           (c/transform ctx
+             (let$ [(sym$ "a") (def$ "b" 42)
+                    (sym$ "c") (def$ "d" 43)]
+               (do$
+                 (sym$ "a")
+                 (sym$ "c"))))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 1) []
+               [:block
+                 [:assign "a" [:value "42"]]
+                 [:assign "b" [:value "a"]]
+                 [:return [:value "b"]]]]
+             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
+            (assoc ctx :counter 2)]
+           (c/transform ctx
+             (let$ [(sym$ "a") 42
+                    (sym$ "b") (sym$ "a")]
+               (sym$ "b")))))
+    (is (re-find #"expects even number of forms"
+          (try (c/transform ctx
+                 (let$ [(sym$ "a") 42
+                        (sym$ "b")]
+                   (sym$ "a")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"no bindings provided"
+          (try (c/transform ctx
+                 (list (sym$ "let*")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"expects only one form in body"
+          (try (c/transform ctx
+                 (list (sym$ "let*") [(sym$ "a") 42
+                                      (sym$ "b") 43]
+                       (sym$ "a")
+                       (sym$ "b")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"binding name must be a simple symbol"
+          (try (c/transform ctx
+                 (let$ ["a" 42]
+                   (sym$ "a")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"binding name must be a simple symbol"
+          (try (c/transform ctx
+                 (let$ [(sym$ "bar/qux") 42]
+                   (sym$ "bar/qux")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"'b' not found"
+          (try (c/transform ctx
+                 (let$ [(sym$ "a") 42]
+                   (sym$ "b")))
+            (catch Exception e (core/object-exception-unwrap e)))))))
