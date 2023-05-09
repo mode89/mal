@@ -243,7 +243,7 @@
            fbody
            body-do
            [[:return body-res]])
-         ctx**])
+         (assoc ctx** :locals (:locals ctx))])
       (let [[name value] (first bindings*)
             [value-res value-do ctx**] (transform ctx* value)]
         (assert (core/simple-symbol? name)
@@ -287,19 +287,18 @@
               (let [bindings-spec (first args)
                     bindings (partition 2 bindings-spec)
                     body-form (second args)
-                    [result ctx2] (gen-temp-name ctx)
-                    [temp-func ctx3] (gen-temp-name ctx2)
-                    [temp-func-body ctx4] (make-let-func
-                                            ctx3 bindings body-form)]
+                    [temp-func ctx2] (gen-temp-name ctx)
+                    [temp-func-body ctx3] (make-let-func
+                                            ctx2 bindings body-form)]
                 (assert (< 0 (count args)) "no bindings provided")
                 (assert (even? (count bindings-spec))
                         "let* expects even number of forms in bindings")
                 (assert (> 3 (count args))
                         "let* expects only one form in body")
-                [[:value result]
-                 [[:def temp-func [] temp-func-body]
-                  [:assign result [:call temp-func nil {}]]]
-                 (assoc ctx4 :locals (:locals ctx))])
+                [[:call temp-func nil {}]
+                 [[:def temp-func []
+                    temp-func-body]]
+                 ctx3])
             (core/symbol "do")
               (if (empty? args)
                 [[:value "None"] nil ctx]

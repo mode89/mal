@@ -440,50 +440,46 @@
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
-    (is (= [[:value (c/temp-name 0)]
-            [[:def (c/temp-name 1) []
-               [:block [:return [:value "None"]]]]
-             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
-            (assoc ctx :counter 2)]
+    (is (= [[:call (c/temp-name 0) nil {}]
+            [[:def (c/temp-name 0) []
+               [:block [:return [:value "None"]]]]]
+            (assoc ctx :counter 1)]
            (c/transform ctx (list (sym$ "let*") []))))
-    (is (= [[:value (c/temp-name 0)]
-            [[:def (c/temp-name 1) []
+    (is (= [[:call (c/temp-name 0) nil {}]
+            [[:def (c/temp-name 0) []
                [:block
                  [:assign "a" [:value "42"]]
-                 [:return [:value "a"]]]]
-             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
-            (assoc ctx :counter 2)]
+                 [:return [:value "a"]]]]]
+            (assoc ctx :counter 1)]
            (c/transform ctx
              (let$ [(sym$ "a") 42]
                (sym$ "a")))))
-    (is (= [[:value (c/temp-name 0)]
-            [[:def (c/temp-name 1) []
+    (is (= [[:call (c/temp-name 0) nil {}]
+            [[:def (c/temp-name 0) []
                [:block
                  [:assign (c/globals "b") [:value "42"]]
                  [:assign "a" [:value "b"]]
                  [:assign (c/globals "d") [:value "43"]]
                  [:assign "c" [:value "d"]]
                  [:value "a"]
-                 [:return [:value "c"]]]]
-             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
+                 [:return [:value "c"]]]]]
             (mock-compile-context
               :ns-registry {"foo" #{"b" "d"}}
               :current-ns "foo"
-              :counter 2)]
+              :counter 1)]
            (c/transform ctx
              (let$ [(sym$ "a") (def$ "b" 42)
                     (sym$ "c") (def$ "d" 43)]
                (do$
                  (sym$ "a")
                  (sym$ "c"))))))
-    (is (= [[:value (c/temp-name 0)]
-            [[:def (c/temp-name 1) []
+    (is (= [[:call (c/temp-name 0) nil {}]
+            [[:def (c/temp-name 0) []
                [:block
                  [:assign "a" [:value "42"]]
                  [:assign "b" [:value "a"]]
-                 [:return [:value "b"]]]]
-             [:assign (c/temp-name 0) [:call (c/temp-name 1) nil {}]]]
-            (assoc ctx :counter 2)]
+                 [:return [:value "b"]]]]]
+            (assoc ctx :counter 1)]
            (c/transform ctx
              (let$ [(sym$ "a") 42
                     (sym$ "b") (sym$ "a")]
