@@ -280,5 +280,7 @@
                         ctx2))))))))
     (core/symbol? form)
       [[:expr (resolve-symbol-name ctx form)] nil ctx]
+    (nil? form)
+      [[:expr "None"] nil ctx]
     :else
       [[:expr (pr-str form)] nil ctx]))

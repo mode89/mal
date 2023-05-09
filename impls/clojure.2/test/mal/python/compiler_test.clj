@@ -369,7 +369,8 @@
 (deftest transform
   (let [ctx (mock-compile-context)]
     (is (= [[:expr "42"] nil ctx] (c/transform ctx 42)))
-    (is (= [[:expr "\"42\""] nil ctx] (c/transform ctx "42"))))
+    (is (= [[:expr "\"42\""] nil ctx] (c/transform ctx "42")))
+    (is (= [[:expr "None"] nil ctx] (c/transform ctx nil))))
   (let [ctx (mock-compile-context :locals #{"foo"})]
     (is (= [[:expr "foo"] nil ctx] (c/transform ctx (sym$ "foo"))))))
 
