@@ -280,6 +280,43 @@
             (conj py-params (mangle param))
             (conj locals param)))))))
 
+(defn do-quote [x]
+  (cond
+    (nil? x)
+      "None"
+    (boolean? x)
+      (if x "True" "False")
+    (number? x)
+      (str x)
+    (string? x)
+      (core/pr-str x)
+    (core/keyword? x)
+      (str "keyword(\"" (:name x) "\")")
+    (core/symbol? x)
+      (str "symbol(\""
+           (when-some [ns (:namespace x)]
+             (str ns "/"))
+           (:name x)
+           "\")")
+    (core/list? x)
+      (str "list(" (join ", " (map do-quote x)) ")")
+    (core/vector? x)
+      (str "vector(" (join ", " (map do-quote x)) ")")
+    (core/map? x)
+      (str "hash_map("
+           (join ", "
+             (sort
+               (map (fn [[k v]]
+                      (str (do-quote k) ", " (do-quote v)))
+                    x)))
+           ")")
+    (set? x)
+      (str "hash_set(" (join ", " (sort (map do-quote x))) ")")
+    :else
+      (core/throw
+        (str "don't know how to quote this: "
+             (core/pr-str x)))))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -376,7 +413,11 @@
                     (cons :block
                       (concat fbody
                         [[:return fbody-res]]))]]
-                 (assoc ctx3 :locals (:locals ctx))]))))
+                 (assoc ctx3 :locals (:locals ctx))])
+            (core/symbol "quote")
+              (let [value (first args)]
+                (assert (= 1 (count args)) "quote expects one argument")
+                [[:value (do-quote value)] nil ctx]))))
     (core/symbol? form)
       [[:value (resolve-symbol-name ctx form)] nil ctx]
     (nil? form)

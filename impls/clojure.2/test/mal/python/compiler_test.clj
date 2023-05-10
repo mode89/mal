@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [def$ do$ if$ fn$ let$ sym$]]))
+            [mal.test.utils :refer [def$ do$ if$ kw$ fn$ let$ quote$ sym$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -659,3 +659,37 @@
                   (list (sym$ "fn*") [(sym$ "a") (sym$ "&") (sym$ "b")]
                         (sym$ "c")))
             (catch Exception e (core/object-exception-unwrap e)))))))
+
+(deftest transform-quote
+  (let [ctx (mock-compile-context)]
+    (is (= [[:value "None"] nil ctx] (c/transform ctx (quote$ nil))))
+    (is (= [[:value "True"] nil ctx] (c/transform ctx (quote$ true))))
+    (is (= [[:value "False"] nil ctx] (c/transform ctx (quote$ false))))
+    (is (= [[:value "42"] nil ctx] (c/transform ctx (quote$ 42))))
+    (is (= [[:value "3.14"] nil ctx] (c/transform ctx (quote$ 3.14))))
+    (is (= [[:value "\"Hello, \\\"World\\\"!\""] nil ctx]
+           (c/transform ctx (quote$ "Hello, \"World\"!"))))
+    (is (= [[:value "keyword(\"foo\")"] nil ctx]
+           (c/transform ctx (quote$ (kw$ "foo")))))
+    (is (= [[:value "symbol(\"foo/bar\")"] nil ctx]
+           (c/transform ctx (quote$ (sym$ "foo/bar")))))
+    (is (= [[:value "symbol(\"baz\")"] nil ctx]
+           (c/transform ctx (quote$ (sym$ "baz")))))
+    (is (= [[:value "list()"] nil ctx] (c/transform ctx (quote$ ()))))
+    (is (= [[:value "list(None, 43, \"hello\", symbol(\"qux\"))"] nil ctx]
+           (c/transform ctx (quote$ (list nil 43 "hello" (sym$ "qux"))))))
+    (is (= [[:value "vector()"] nil ctx] (c/transform ctx (quote$ []))))
+    (is (= [[:value "vector(None, 43, \"hello\", symbol(\"qux\"))"] nil ctx]
+           (c/transform ctx (quote$ [nil 43 "hello" (sym$ "qux")]))))
+    (is (= [[:value "hash_map()"] nil ctx] (c/transform ctx (quote$ {}))))
+    (is (= [[:value "hash_map(\"hello\", symbol(\"qux\"), None, 43)"] nil ctx]
+           (c/transform ctx (quote$ {nil 43 "hello" (sym$ "qux")}))))
+    (is (= [[:value "hash_set()"] nil ctx] (c/transform ctx (quote$ #{}))))
+    (is (= [[:value "hash_set(\"hello\", 43, None, symbol(\"qux\"))"] nil ctx]
+           (c/transform ctx (quote$ #{nil 43 "hello" (sym$ "qux")}))))
+    (is (re-find #"quote expects one argument"
+          (try (c/transform ctx (list (sym$ "quote")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"quote expects one argument"
+          (try (c/transform ctx (list (sym$ "quote") 1 2))
+            (catch Error e (.getMessage e)))))))
