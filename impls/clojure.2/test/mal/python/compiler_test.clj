@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [def$ do$ if$ let$ sym$]]))
+            [mal.test.utils :refer [def$ do$ if$ fn$ let$ sym$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -562,3 +562,100 @@
           (try (c/transform ctx
                  (list (sym$ "if") true 42 43 44))
             (catch Error e (.getMessage e)))))))
+
+(deftest transform-fn
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"bar" "baz"}}
+              :current-ns "foo"
+              :locals #{"qux"})]
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) []
+               [:block
+                 [:return [:value "None"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx (fn$ []))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) []
+               [:block
+                 [:return [:value "42"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx (fn$ [] 42))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) []
+               [:block
+                 [:value "bar"]
+                 [:value "baz"]
+                 [:return [:value "qux"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx
+             (fn$ []
+               (do$ (sym$ "bar")
+                    (sym$ "baz")
+                    (sym$ "qux"))))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) ["a"]
+               [:block
+                 [:return [:value "42"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx (fn$ [(sym$ "a")] 42))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) ["b"]
+               [:block
+                 [:return [:value "b"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx (fn$ [(sym$ "b")] (sym$ "b")))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) ["c" "d" "*e"]
+               [:block
+                 [:value "c"]
+                 [:value "d"]
+                 [:return [:value "e"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx
+             (fn$ [(sym$ "c") (sym$ "d") (sym$ "&") (sym$ "e")]
+               (do$ (sym$ "c")
+                    (sym$ "d")
+                    (sym$ "e"))))))
+    (is (= [[:value (c/temp-name 0)]
+            [[:def (c/temp-name 0) ["*args"]
+               [:block
+                 [:return [:value "args"]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx
+             (fn$ [(sym$ "&") (sym$ "args")]
+               (sym$ "args")))))
+    (is (re-find #"expects at most 2 arguments"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") [] 42 43))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"function parameter must be a simple symbol"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") ["a"]
+                        (sym$ "a")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"function parameter must be a simple symbol"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") [(sym$ "foo/bar")]
+                        (sym$ "foo/bar")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"expected only one parameter after &"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") [(sym$ "a")
+                                      (sym$ "&") (sym$ "b") (sym$ "c")]
+                        (sym$ "a")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"variadic parameter must be a simple symbol"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") [(sym$ "a") (sym$ "&") "b"]
+                        (sym$ "a")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"variadic parameter must be a simple symbol"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") [(sym$ "a") (sym$ "&") (sym$ "foo/bar")]
+                        (sym$ "a")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"'c' not found"
+          (try (c/transform ctx
+                  (list (sym$ "fn*") [(sym$ "a") (sym$ "&") (sym$ "b")]
+                        (sym$ "c")))
+            (catch Exception e (core/object-exception-unwrap e)))))))

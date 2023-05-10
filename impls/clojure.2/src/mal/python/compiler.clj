@@ -1,5 +1,6 @@
 (ns mal.python.compiler
-  (:require [clojure.string :refer [join triml]]
+  (:require [clojure.set :refer [union]]
+            [clojure.string :refer [join triml]]
             [mal.core :as core]))
 
 (defrecord CompileContext [ns-registry current-ns locals counter])
@@ -256,6 +257,29 @@
             [[:assign (mangle name) value-res]])
           (update ctx** :locals conj name))))))
 
+(defn handle-fn-params [params]
+  (loop [params params
+         py-params []
+         locals #{}]
+    (if (empty? params)
+      [py-params locals]
+      (let [param (first params)]
+        (assert (core/simple-symbol? param)
+          "function parameter must be a simple symbol")
+        (if (= (:name param) "&")
+          (let [var-params (second params)]
+            (assert (= (count params) 2)
+              "expected only one parameter after &")
+            (assert (core/simple-symbol? var-params)
+              "variadic parameter must be a simple symbol")
+            [(conj py-params
+                   (str "*" (mangle var-params)))
+             (conj locals var-params)])
+          (recur
+            (rest params)
+            (conj py-params (mangle param))
+            (conj locals param)))))))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -336,7 +360,23 @@
                         (concat
                           else-body
                           [[:assign result else]]))]])
-                 ctx5]))))
+                 ctx5])
+            (core/symbol "fn*")
+              (let [params (first args)
+                    body (second args)
+                    [py-params locals] (handle-fn-params params)
+                    [func ctx2] (gen-temp-name ctx)
+                    [fbody-res fbody ctx3] (transform
+                                             (update ctx2
+                                               :locals union locals)
+                                             body)]
+                (assert (>= 2 (count args)) "fn* expects at most 2 arguments")
+                [[:value func]
+                 [[:def func py-params
+                    (cons :block
+                      (concat fbody
+                        [[:return fbody-res]]))]]
+                 (assoc ctx3 :locals (:locals ctx))]))))
     (core/symbol? form)
       [[:value (resolve-symbol-name ctx form)] nil ctx]
     (nil? form)
