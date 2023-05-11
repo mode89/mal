@@ -234,6 +234,21 @@
 
 (declare transform)
 
+(defn transform-def [ctx args]
+  (let [name (first args)
+        value-form (second args)]
+    (assert (core/symbol? name)
+            "def! expects a symbol as the first argument")
+    (assert (= (count args) 2) "def! expects 2 arguments")
+    (let [[val-expr val-body ctx2] (transform ctx value-form)
+          current-ns (:current-ns ctx)]
+      (assert (some? current-ns) "no current namespace")
+      [[:value (mangle name)]
+       (conj val-body [:assign (globals (mangle name)) val-expr])
+       (update-in ctx2
+         [:ns-registry current-ns :bindings]
+         conj name)])))
+
 (defn make-let-func [ctx bindings body]
   (loop [bindings* bindings
          fbody [:block]
@@ -256,6 +271,63 @@
             value-do
             [[:assign (mangle name) value-res]])
           (update ctx** :locals conj name))))))
+
+(defn transform-let [ctx args]
+  (let [bindings-spec (first args)
+        bindings (partition 2 bindings-spec)
+        body-form (second args)
+        [temp-func ctx2] (gen-temp-name ctx)
+        [temp-func-body ctx3] (make-let-func
+                                ctx2 bindings body-form)]
+    (assert (< 0 (count args)) "no bindings provided")
+    (assert (even? (count bindings-spec))
+            "let* expects even number of forms in bindings")
+    (assert (> 3 (count args))
+            "let* expects only one form in body")
+    [[:call temp-func nil {}]
+     [[:def temp-func []
+        temp-func-body]]
+     ctx3]))
+
+(defn transform-do [ctx args]
+  (if (empty? args)
+    [[:value "None"] nil ctx]
+    (loop [args args
+           body nil
+           ctx ctx]
+      (let [[res res-body ctx2] (transform ctx (first args))]
+        (if (= 1 (count args))
+          [res (concat body res-body) ctx2]
+          (recur (rest args)
+            (concat
+              body
+              res-body
+              [res])
+            ctx2))))))
+
+(defn transform-if [ctx args]
+  (let [[result ctx2] (gen-temp-name ctx)
+        [cond cond-body ctx3] (transform ctx2 (first args))
+        [then then-body ctx4] (transform ctx3 (second args))
+        [else else-body ctx5] (transform ctx4
+                                (when (> (count args) 2)
+                                  (nth args 2)))]
+    (assert (> (count args) 1) "if expects at least 2 arguments")
+    (assert (< (count args) 4) "if expects at most 3 arguments")
+    [[:value result]
+     (concat
+       cond-body
+       [[:if cond
+          (cons :block
+            (concat
+              then-body
+              [[:assign result then]]))
+          nil
+          (cons :block
+            (concat
+              else-body
+              [[:assign result else]]))]])
+     ctx5]))
 
 (defn handle-fn-params [params]
   (loop [params params
@@ -280,42 +352,48 @@
             (conj py-params (mangle param))
             (conj locals param)))))))
 
+(defn transform-fn [ctx args]
+  (let [params (first args)
+        body (second args)
+        [py-params locals] (handle-fn-params params)
+        [func ctx2] (gen-temp-name ctx)
+        [fbody-res fbody ctx3] (transform
+                                 (update ctx2
+                                   :locals union locals)
+                                 body)]
+    (assert (>= 2 (count args)) "fn* expects at most 2 arguments")
+    [[:value func]
+     [[:def func py-params
+        (cons :block
+          (concat fbody
+            [[:return fbody-res]]))]]
+     (assoc ctx3 :locals (:locals ctx))]))
+
 (defn do-quote [x]
   (cond
-    (nil? x)
-      "None"
-    (boolean? x)
-      (if x "True" "False")
-    (number? x)
-      (str x)
-    (string? x)
-      (core/pr-str x)
-    (core/keyword? x)
-      (str "keyword(\"" (:name x) "\")")
-    (core/symbol? x)
-      (str "symbol(\""
-           (when-some [ns (:namespace x)]
-             (str ns "/"))
-           (:name x)
-           "\")")
-    (core/list? x)
-      (str "list(" (join ", " (map do-quote x)) ")")
-    (core/vector? x)
-      (str "vector(" (join ", " (map do-quote x)) ")")
-    (core/map? x)
-      (str "hash_map("
-           (join ", "
-             (sort
-               (map (fn [[k v]]
-                      (str (do-quote k) ", " (do-quote v)))
-                    x)))
-           ")")
-    (set? x)
-      (str "hash_set(" (join ", " (sort (map do-quote x))) ")")
-    :else
-      (core/throw
-        (str "don't know how to quote this: "
-             (core/pr-str x)))))
+    (nil? x) "None"
+    (boolean? x) (if x "True" "False")
+    (number? x) (str x)
+    (string? x) (core/pr-str x)
+    (core/keyword? x) (str "keyword(\"" (:name x) "\")")
+    (core/symbol? x) (str "symbol(\""
+                          (when-some [ns (:namespace x)]
+                            (str ns "/"))
+                          (:name x)
+                          "\")")
+    (core/list? x) (str "list(" (join ", " (map do-quote x)) ")")
+    (core/vector? x) (str "vector(" (join ", " (map do-quote x)) ")")
+    (core/map? x) (str "hash_map("
+                       (join ", "
+                         (sort
+                           (map (fn [[k v]]
+                                  (str (do-quote k) ", " (do-quote v)))
+                                x)))
+                       ")")
+    (set? x) (str "hash_set(" (join ", " (sort (map do-quote x))) ")")
+    :else (core/throw
+            (str "don't know how to quote this: "
+                 (core/pr-str x)))))
 
 (defn transform
   "Transform lisp AST into python AST"
@@ -325,104 +403,29 @@
           (instance? CompileContext (nth % 2))]}
   (cond
     (list? form)
-      (if (empty? form)
-        [[:value "list()"] nil ctx]
-        (let [head (first form)
-              args (rest form)]
-          (condp = head
-            (core/symbol "def!")
-              (let [name (first args)
-                    value-form (second args)]
-                (assert (core/symbol? name)
-                        "def! expects a symbol as the first argument")
-                (assert (= (count args) 2) "def! expects 2 arguments")
-                (let [[val-expr val-body ctx2] (transform ctx value-form)
-                      current-ns (:current-ns ctx)]
-                  (assert (some? current-ns) "no current namespace")
-                  [[:value (mangle name)]
-                   (conj val-body [:assign (globals (mangle name)) val-expr])
-                   (update-in ctx2
-                     [:ns-registry current-ns :bindings]
-                     conj name)]))
-            (core/symbol "let*")
-              (let [bindings-spec (first args)
-                    bindings (partition 2 bindings-spec)
-                    body-form (second args)
-                    [temp-func ctx2] (gen-temp-name ctx)
-                    [temp-func-body ctx3] (make-let-func
-                                            ctx2 bindings body-form)]
-                (assert (< 0 (count args)) "no bindings provided")
-                (assert (even? (count bindings-spec))
-                        "let* expects even number of forms in bindings")
-                (assert (> 3 (count args))
-                        "let* expects only one form in body")
-                [[:call temp-func nil {}]
-                 [[:def temp-func []
-                    temp-func-body]]
-                 ctx3])
-            (core/symbol "do")
-              (if (empty? args)
-                [[:value "None"] nil ctx]
-                (loop [args args
-                       body nil
-                       ctx ctx]
-                  (let [[res res-body ctx2] (transform ctx (first args))]
-                    (if (= 1 (count args))
-                      [res (concat body res-body) ctx2]
-                      (recur (rest args)
-                        (concat
-                          body
-                          res-body
-                          [res])
-                        ctx2)))))
-            (core/symbol "if")
-              (let [[result ctx2] (gen-temp-name ctx)
-                    [cond cond-body ctx3] (transform ctx2 (first args))
-                    [then then-body ctx4] (transform ctx3 (second args))
-                    [else else-body ctx5] (transform ctx4
-                                            (when (> (count args) 2)
-                                              (nth args 2)))]
-                (assert (> (count args) 1) "if expects at least 2 arguments")
-                (assert (< (count args) 4) "if expects at most 3 arguments")
-                [[:value result]
-                 (concat
-                   cond-body
-                   [[:if cond
-                      (cons :block
-                        (concat
-                          then-body
-                          [[:assign result then]]))
-                      nil
-                      (cons :block
-                        (concat
-                          else-body
-                          [[:assign result else]]))]])
-                 ctx5])
-            (core/symbol "fn*")
-              (let [params (first args)
-                    body (second args)
-                    [py-params locals] (handle-fn-params params)
-                    [func ctx2] (gen-temp-name ctx)
-                    [fbody-res fbody ctx3] (transform
-                                             (update ctx2
-                                               :locals union locals)
-                                             body)]
-                (assert (>= 2 (count args)) "fn* expects at most 2 arguments")
-                [[:value func]
-                 [[:def func py-params
-                    (cons :block
-                      (concat fbody
-                        [[:return fbody-res]]))]]
-                 (assoc ctx3 :locals (:locals ctx))])
-            (core/symbol "quote")
-              (let [value (first args)]
-                (assert (= 1 (count args)) "quote expects one argument")
-                [[:value (do-quote value)] nil ctx]))))
+    (if (empty? form)
+      [[:value "list()"] nil ctx]
+      (let [head (first form)
+            args (rest form)]
+        (condp = head
+          (core/symbol "def!") (transform-def ctx args)
+          (core/symbol "let*") (transform-let ctx args)
+          (core/symbol "do") (transform-do ctx args)
+          (core/symbol "if") (transform-if ctx args)
+          (core/symbol "fn*") (transform-fn ctx args)
+          (core/symbol "quote") (let [value (first args)]
+                                  (assert (= 1 (count args))
+                                    "quote expects one argument")
+                                  [[:value (do-quote value)] nil ctx]))))
+
     (core/symbol? form)
-      [[:value (resolve-symbol-name ctx form)] nil ctx]
+    [[:value (resolve-symbol-name ctx form)] nil ctx]
+
     (nil? form)
-      [[:value "None"] nil ctx]
+    [[:value "None"] nil ctx]
+
     (boolean? form)
-      [[:value (if form "True" "False")] nil ctx]
+    [[:value (if form "True" "False")] nil ctx]
+
     :else
-      [[:value (pr-str form)] nil ctx]))
+    [[:value (pr-str form)] nil ctx]))
