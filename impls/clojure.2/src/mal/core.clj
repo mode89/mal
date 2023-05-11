@@ -250,32 +250,35 @@
         (cons (fn-env-bindings env-template args)
               locals)))))
 
-(defn quasiquote [ast]
+(defn expand-quasiquote [ast]
   (if (list? ast)
     (cond
       (empty? ast)
-        ast
+      ast
+
       (and (= (first ast) (symbol "unquote"))
            (= (count ast) 2))
-        (second ast)
+      (second ast)
+
       :else
-        (let [element (first ast)]
-          (if (and (list? element)
-                   (= (first element) (symbol "splice-unquote")))
-            (list (symbol "concat")
-                  (second element)
-                  (quasiquote (rest ast)))
-            (list (symbol "cons")
-                  (quasiquote element)
-                  (quasiquote (rest ast))))))
+      (let [element (first ast)]
+        (if (and (list? element)
+                 (= (first element) (symbol "splice-unquote")))
+          (list (symbol "concat")
+                (second element)
+                (expand-quasiquote (rest ast)))
+          (list (symbol "cons")
+                (expand-quasiquote element)
+                (expand-quasiquote (rest ast))))))
     (cond
       (or (symbol? ast) (map? ast))
-        (list (symbol "quote") ast)
+      (list (symbol "quote") ast)
+
       (vector? ast)
-        (list (symbol "vec")
-          (quasiquote (seq ast)))
+      (list (symbol "vec") (expand-quasiquote (seq ast)))
+
       :else
-        ast)))
+      ast)))
 
 (defn macroexpand [ctx locals form]
   (if (list? form)
@@ -368,10 +371,10 @@
               (symbol "quasiquote")
                 (do (assert (= (count args) 1)
                       "quasiquote expects 1 argument")
-                    (recur ctx locals (quasiquote (first args))))
+                    (recur ctx locals (expand-quasiquote (first args))))
               (symbol "quasiquoteexpand")
                 (do (assert (= (count args) 1))
-                    (quasiquote (first args)))
+                    (expand-quasiquote (first args)))
               (symbol "macroexpand")
                 (do (assert (= (count args) 1))
                     (macroexpand ctx locals (first args)))

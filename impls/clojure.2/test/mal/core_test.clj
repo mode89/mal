@@ -401,18 +401,18 @@
                (list (sym$ "quote") (sym$ "a") (sym$ "b")))
           (catch Error e (.getMessage e))))))
 
-(deftest core-quasiquote
-  (is (= (core/quasiquote 42) 42))
-  (is (= (core/quasiquote (sym$ "foo")) (quote$ (sym$ "foo"))))
-  (is (= (core/quasiquote (list)) (list)))
-  (is (= (core/quasiquote (list (core/symbol "unquote") 42)) 42))
-  (is (= (core/quasiquote (list 42)) (list (core/symbol "cons") 42 '())))
-  (is (= (core/quasiquote (list 1 2)) (cons$ 1 (cons$ 2 '()))))
-  (is (= (core/quasiquote (list (spunq$ (sym$ "foo"))))
+(deftest core-expand-quasiquote
+  (is (= (core/expand-quasiquote 42) 42))
+  (is (= (core/expand-quasiquote (sym$ "foo")) (quote$ (sym$ "foo"))))
+  (is (= (core/expand-quasiquote (list)) (list)))
+  (is (= (core/expand-quasiquote (list (core/symbol "unquote") 42)) 42))
+  (is (= (core/expand-quasiquote (list 42)) (list (core/symbol "cons") 42 '())))
+  (is (= (core/expand-quasiquote (list 1 2)) (cons$ 1 (cons$ 2 '()))))
+  (is (= (core/expand-quasiquote (list (spunq$ (sym$ "foo"))))
          (concat$ (sym$ "foo") '())))
-  (is (= (core/quasiquote (list 42 (spunq$ (sym$ "foo"))))
+  (is (= (core/expand-quasiquote (list 42 (spunq$ (sym$ "foo"))))
          (cons$ 42 (concat$ (sym$ "foo") '()))))
-  (is (= (core/quasiquote (list (spunq$ (sym$ "foo")) 42))
+  (is (= (core/expand-quasiquote (list (spunq$ (sym$ "foo")) 42))
          (concat$ (sym$ "foo") (cons$ 42 '())))))
 
 (deftest eval-quasiquote
