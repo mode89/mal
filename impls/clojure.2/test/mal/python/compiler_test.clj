@@ -694,3 +694,35 @@
     (is (re-find #"quote expects one argument"
           (try (c/transform ctx (list (sym$ "quote") 1 2))
             (catch Error e (.getMessage e)))))))
+
+(deftest transform-call
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"bar" "baz"}}
+              :current-ns "foo"
+              :locals #{"qux"})]
+    (is (= [[:call [:value "foo.bar"] [] {}] [] ctx]
+           (c/transform ctx (list (sym$ "foo/bar")))))
+    (is (= [[:call [:value "baz"]
+              [[:value "1"] [:value "2"] [:value "3"]] {}]
+            []
+            ctx]
+           (c/transform ctx (list (sym$ "baz") 1 2 3))))
+    (is (= [[:call [:value "qux"]
+              [[:value "\"hello\""] [:value "a"] [:value "bar"]]
+              {}]
+            [[:assign (c/globals "a") [:value "43"]]]
+            (update-in ctx [:ns-registry (sym$ "foo") :bindings]
+              conj (sym$ "a"))]
+           (c/transform ctx
+             (list (sym$ "qux") "hello" (def$ "a" 43) (sym$ "bar")))))
+    (is (= [[:call (c/temp-name 0) [[:value "b"]] {}]
+            [[:assign (c/globals "a") [:value "1"]]
+             [:assign (c/temp-name 0)
+               [:call [:value "bar"] [[:value "a"]] {}]]
+             [:assign (c/globals "b") [:value "2"]]]
+            (-> ctx
+                (update-in [:ns-registry (sym$ "foo") :bindings]
+                  conj (sym$ "a") (sym$ "b"))
+                (assoc :counter 1))]
+           (c/transform ctx
+             (list (list (sym$ "bar") (def$ "a" 1)) (def$ "b" 2)))))))

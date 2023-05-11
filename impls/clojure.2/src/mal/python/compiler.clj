@@ -395,6 +395,31 @@
             (str "don't know how to quote this: "
                  (core/pr-str x)))))
 
+(defn transform-call [ctx form]
+  (let [head (first form)
+        [head-res head-do ctx2] (transform ctx head)]
+    (loop [args (rest form)
+           ctx* ctx2
+           args-res []
+           args-do []]
+      (if (empty? args)
+        (if (= :value (first head-res))
+          [[:call head-res args-res {}]
+           (concat head-do args-do)
+           ctx*]
+          (let [[head-res-temp ctx**] (gen-temp-name ctx*)]
+            [[:call head-res-temp args-res {}]
+             (concat
+               head-do
+               [[:assign head-res-temp head-res]]
+               args-do)
+             ctx**]))
+        (let [[arg-res arg-do ctx**] (transform ctx* (first args))]
+          (recur (rest args)
+                 ctx**
+                 (conj args-res arg-res)
+                 (concat args-do arg-do)))))))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -416,7 +441,8 @@
           (core/symbol "quote") (let [value (first args)]
                                   (assert (= 1 (count args))
                                     "quote expects one argument")
-                                  [[:value (do-quote value)] nil ctx]))))
+                                  [[:value (do-quote value)] nil ctx])
+          (transform-call ctx form))))
 
     (core/symbol? form)
     [[:value (resolve-symbol-name ctx form)] nil ctx]
