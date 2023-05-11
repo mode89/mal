@@ -372,7 +372,8 @@
     (is (= [[:value "\"42\""] nil ctx] (c/transform ctx "42")))
     (is (= [[:value "None"] nil ctx] (c/transform ctx nil)))
     (is (= [[:value "True"] nil ctx] (c/transform ctx true)))
-    (is (= [[:value "False"] nil ctx] (c/transform ctx false))))
+    (is (= [[:value "False"] nil ctx] (c/transform ctx false)))
+    (is (= [[:value "list()"] nil ctx] (c/transform ctx ()))))
   (let [ctx (mock-compile-context :locals #{"foo"})]
     (is (= [[:value "foo"] nil ctx] (c/transform ctx (sym$ "foo"))))))
 
