@@ -253,23 +253,37 @@
 (defn expand-quasiquote [ast]
   (if (list? ast)
     (cond
-      (empty? ast)
-      ast
+      (= (first ast) (symbol "unquote"))
+      (let [unquoted (second ast)]
+        (assert (= (count ast) 2) "unquote expects only one argument")
+        unquoted)
 
-      (and (= (first ast) (symbol "unquote"))
-           (= (count ast) 2))
-      (second ast)
+      (= (first ast) (symbol "splice-unquote"))
+      (mal.core/throw "splice-unquote used outside of list context")
 
       :else
-      (let [element (first ast)]
-        (if (and (list? element)
-                 (= (first element) (symbol "splice-unquote")))
-          (list (symbol "concat")
-                (second element)
-                (expand-quasiquote (rest ast)))
-          (list (symbol "cons")
-                (expand-quasiquote element)
-                (expand-quasiquote (rest ast))))))
+      (loop [elements ast
+             segments []
+             last-segment []]
+        (if (empty? elements)
+          (cons (symbol "concat")
+                (if (empty? last-segment)
+                  segments
+                  (conj segments last-segment)))
+          (let [element (first elements)]
+            (if (and (list? element)
+                     (= (symbol "splice-unquote") (first element)))
+              (let [unquoted (second element)]
+                (assert (= (count element) 2)
+                  "splice-unquote expects only one argument")
+                (recur (rest elements)
+                       (if (empty? last-segment)
+                         (conj segments unquoted)
+                         (conj segments last-segment unquoted))
+                       []))
+              (recur (rest elements)
+                     segments
+                     (conj last-segment (expand-quasiquote element))))))))
     (cond
       (or (symbol? ast) (map? ast))
       (list (symbol "quote") ast)
