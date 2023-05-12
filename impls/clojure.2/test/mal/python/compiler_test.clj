@@ -137,13 +137,15 @@
 
 (deftest emit
   (is (= (c/emit [:assign "a" [:value "b"]]) ["a = b"]))
-  (is (= (c/emit [:call "foo" [[:value "a"] [:value "b"]]
-                              {"c" [:value "42"]}])
+  (is (= (c/emit [:call [:value "foo"]
+                   [[:value "a"] [:value "b"]]
+                   {"c" [:value "42"]}])
          ["foo(a, b, c=42)"]))
   (is (= (c/emit [:block
                    [:assign "a" [:value "b"]]
-                   [:call "foo" [[:value "a"] [:value "b"]]
-                                {"c" [:value "42"]}]])
+                   [:call [:value "foo"]
+                     [[:value "a"] [:value "b"]]
+                     {"c" [:value "42"]}]])
          ["a = b"
           "foo(a, b, c=42)"]))
   (is (= (c/emit [:block
@@ -174,18 +176,19 @@
   (is (= (c/emit [:if [:value "cond1"]
                    [:block
                      [:assign "a" [:value "b"]]
-                     [:call "foo" [[:value "a"] [:value "b"]] {}]]
+                     [:call [:value "foo"] [[:value "a"] [:value "b"]] {}]]
                    [[[:value "cond2"]
                        [:block
                          [:assign "f" [:value "g"]]
                          [:assign "h" [:value "i"]]]]
                     [[:value "cond3"]
                        [:block
-                         [:call "baz" [[:value "j"] [:value "k"]] {}]
+                         [:call [:value "baz"] [[:value "j"] [:value "k"]] {}]
                          [:assign "l" [:value "m"]]]]]
                    [:block
-                     [:call "bar" [[:value "x"] [:value "y"]]
-                                  {"z" [:value "42"]}]
+                     [:call [:value "bar"]
+                       [[:value "x"] [:value "y"]]
+                       {"z" [:value "42"]}]
                      [:assign "p" [:value "q"]]]])
          ["if cond1:"
           "  a = b"
@@ -206,7 +209,7 @@
   (is (= (c/emit [:while [:value "a"]
                    [:block
                      [:assign "b" [:value "c"]]
-                     [:if [:call "foo"
+                     [:if [:call [:value "foo"]
                             [[:value "a"] [:value "b"]]
                             {"c" [:value "42"]}]
                        [:block
@@ -240,8 +243,9 @@
   (is (= (c/emit [:try
                    [:block
                      [:assign "a" [:value "b"]]
-                     [:call "foo" [[:value "a"] [:value "b"]]
-                                  {"c" [:value "42"]}]]
+                     [:call [:value "foo"]
+                       [[:value "a"] [:value "b"]]
+                       {"c" [:value "42"]}]]
                    [["Exception" nil
                       [:block
                         [:assign "d" [:value "e"]]

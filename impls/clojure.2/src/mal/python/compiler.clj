@@ -123,8 +123,9 @@
       :assign (let [[name value] (rest ast)]
                 (assert (expression? value))
                 (emit-assign name (first (emit value))))
-      :call (let [[name args kwargs] (rest ast)]
-              (emit-call name
+      :call (let [[name args] (rest ast)]
+              (assert (expression? name))
+              (emit-call (first (emit name))
                 (map (fn [arg]
                        (assert (expression? arg))
                        (first (emit arg)))
