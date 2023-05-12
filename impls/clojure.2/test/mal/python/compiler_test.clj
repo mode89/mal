@@ -275,11 +275,11 @@
           "  l = m"
           "  return n"])))
 
-(deftest mangle
-  (is (= "foo" (c/mangle (sym$ "foo"))))
-  (is (= "foo.bar.baz" (c/mangle (sym$ "foo.bar/baz"))))
+(deftest munge-symbol
+  (is (= "foo" (c/munge-symbol (sym$ "foo"))))
+  (is (= "foo.bar.baz" (c/munge-symbol (sym$ "foo.bar/baz"))))
   (is (re-find #"must be a symbol"
-        (try (c/mangle "foo")
+        (try (c/munge-symbol "foo")
           (catch Error e (.getMessage e))))))
 
 (deftest resolve-symbol-name

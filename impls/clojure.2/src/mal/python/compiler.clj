@@ -181,7 +181,7 @@
                (when (some? finally)
                  (emit finally)))))))
 
-(defn mangle [sym]
+(defn munge-symbol [sym]
   (assert (core/symbol? sym) "must be a symbol")
   (str
     (when-some [ns (:namespace sym)]
@@ -216,18 +216,18 @@
                 simp-sym (core/symbol sym-name)]
             (assert (set? bindings) "namespace bindings must be a set")
             (if (contains? bindings simp-sym)
-              (mangle sym)
+              (munge-symbol sym)
               (throw-not-found sym)))
           (core/throw (str "namespace '" sym-ns-name "' not found"))))
     (contains? (:locals ctx) sym)
-      (mangle sym)
+      (munge-symbol sym)
     (some? (:current-ns ctx))
       (let [current-ns (get (:ns-registry ctx) (:current-ns ctx))
             bindings (:bindings current-ns)]
         (assert (some? current-ns) "current namespace not found")
         (assert (set? bindings) "namespace bindings must be a set")
         (if (contains? bindings sym)
-          (mangle sym)
+          (munge-symbol sym)
           (throw-not-found sym)))
     :else
       (throw-not-found sym)))
@@ -243,8 +243,8 @@
     (let [[val-expr val-body ctx2] (transform ctx value-form)
           current-ns (:current-ns ctx)]
       (assert (some? current-ns) "no current namespace")
-      [[:value (mangle name)]
-       (conj val-body [:assign (globals (mangle name)) val-expr])
+      [[:value (munge-symbol name)]
+       (conj val-body [:assign (globals (munge-symbol name)) val-expr])
        (update-in ctx2
          [:ns-registry current-ns :bindings]
          conj name)])))
@@ -269,7 +269,7 @@
           (concat
             fbody
             value-do
-            [[:assign (mangle name) value-res]])
+            [[:assign (munge-symbol name) value-res]])
           (update ctx** :locals conj name))))))
 
 (defn transform-let [ctx args]
@@ -345,11 +345,11 @@
             (assert (core/simple-symbol? var-params)
               "variadic parameter must be a simple symbol")
             [(conj py-params
-                   (str "*" (mangle var-params)))
+                   (str "*" (munge-symbol var-params)))
              (conj locals var-params)])
           (recur
             (rest params)
-            (conj py-params (mangle param))
+            (conj py-params (munge-symbol param))
             (conj locals param)))))))
 
 (defn transform-fn [ctx args]
