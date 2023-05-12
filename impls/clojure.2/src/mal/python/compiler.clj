@@ -465,25 +465,36 @@
             [[:return fbody-res]]))]]
      (assoc ctx3 :locals (:locals ctx))]))
 
-(defn quote-expr [x]
+(defn quote-expr [ctx x]
   (cond
     (nil? x) [:value "None"]
     (boolean? x) [:value (if x "True" "False")]
-    (number? x) [:value (str x)]
+    (number? x) [:value (core/str x)]
     (string? x) [:value (core/pr-str x)]
-    (core/keyword? x) [:call [:value "keyword"]
+    (core/keyword? x) [:call [:value (resolve-symbol-name ctx
+                                       (core/symbol "keyword"))]
                         [:value (core/pr-str (:name x))]]
-    (core/symbol? x) [:call [:value "symbol"]
-                       [:value (str "\"" (core/pr-str x) "\"")]]
-    (core/list? x) (concat [:call [:value "list"]] (map quote-expr x))
-    (core/vector? x) (concat [:call [:value "vector"]] (map quote-expr x))
-    (core/map? x) (concat [:call [:value "hash_map"]]
+    (core/symbol? x) [:call
+                       [:value (resolve-symbol-name ctx
+                                 (core/symbol "symbol"))]
+                       [:value (core/str "\"" x "\"")]]
+    (core/list? x) (concat [:call [:value (resolve-symbol-name ctx
+                                            (core/symbol "list"))]]
+                           (map #(quote-expr ctx %) x))
+    (core/vector? x) (concat [:call [:value (resolve-symbol-name ctx
+                                              (core/symbol "vector"))]]
+                             (map #(quote-expr ctx %) x))
+    (core/map? x) (concat [:call [:value (resolve-symbol-name ctx
+                                           (core/symbol "hash-map"))]]
                           (apply concat
                             (sort
                               (map (fn [[k v]]
-                                     [(quote-expr k) (quote-expr v)])
+                                     [(quote-expr ctx k)
+                                      (quote-expr ctx v)])
                                    x))))
-    (set? x) (concat [:call [:value "hash_set"]] (sort (map quote-expr x)))
+    (set? x) (concat [:call [:value (resolve-symbol-name ctx
+                                      (core/symbol "hash-set"))]]
+                     (sort (map #(quote-expr ctx %) x)))
     :else (core/throw
             (str "don't know how to quote this: "
                  (core/pr-str x)))))
@@ -534,7 +545,7 @@
           (core/symbol "quote") (let [value (first args)]
                                   (assert (= 1 (count args))
                                     "quote expects one argument")
-                                  [(quote-expr value) nil ctx])
+                                  [(quote-expr ctx value) nil ctx])
           (transform-call ctx form))))
 
     (core/symbol? form)

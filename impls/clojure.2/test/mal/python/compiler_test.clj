@@ -689,7 +689,14 @@
             (catch Exception e (core/object-exception-unwrap e)))))))
 
 (deftest transform-quote
-  (let [ctx (mock-compile-context)]
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"hash-map"
+                                    "hash-set"
+                                    "keyword"
+                                    "list"
+                                    "symbol"
+                                    "vector"}}
+              :current-ns "foo")]
     (is (= [[:value "None"] nil ctx] (c/transform ctx (quote$ nil))))
     (is (= [[:value "True"] nil ctx] (c/transform ctx (quote$ true))))
     (is (= [[:value "False"] nil ctx] (c/transform ctx (quote$ false))))
@@ -703,9 +710,9 @@
            (c/transform ctx (quote$ (sym$ "foo/bar")))))
     (is (= [[:call [:value "symbol"] [:value "\"baz\""]] nil ctx]
            (c/transform ctx (quote$ (sym$ "baz")))))
-    (is (= [[:call [:value "list"]] nil ctx]
+    (is (= [[:call [:value "___list"]] nil ctx]
            (c/transform ctx (quote$ (list)))))
-    (is (= [[:call [:value "list"]
+    (is (= [[:call [:value "___list"]
               [:value "None"]
               [:value "43"]
               [:value "\"hello\""]
