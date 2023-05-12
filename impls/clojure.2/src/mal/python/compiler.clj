@@ -1,7 +1,35 @@
 (ns mal.python.compiler
   (:require [clojure.set :refer [union]]
-            [clojure.string :refer [join triml]]
+            [clojure.string :refer [join split triml]]
             [mal.core :as core]))
+
+(def MUNGE-MAP
+  {\- "_"
+   \. "_DOT_"
+   \: "_COLON_"
+   \+ "_PLUS_"
+   \> "_GT_"
+   \< "_LT_"
+   \= "_EQ_"
+   \~ "_TILDE_"
+   \! "_BANG_"
+   \@ "_AT_"
+   \# "_SHARP_"
+   \' "_SQUOTE_"
+   \" "_DQUOTE_"
+   \% "_PERCENT_"
+   \^ "_CARET_"
+   \& "_AMPER_"
+   \* "_STAR_"
+   \| "_BAR_"
+   \{ "_LBRACE_"
+   \} "_RBRACE_"
+   \[ "_LBRACK_"
+   \] "_RBRACK_"
+   \/ "_SLASH_"
+   \\ "_BSLASH_"
+   \? "_QMARK_"
+   \$ "_DOLLAR_"})
 
 (defrecord CompileContext [ns-registry current-ns locals counter])
 
@@ -181,12 +209,26 @@
                (when (some? finally)
                  (emit finally)))))))
 
+(defn munge-name [name]
+  (assert (string? name))
+  (apply str
+    (map
+      (fn [c]
+        (if (contains? MUNGE-MAP c)
+          (get MUNGE-MAP c)
+          c))
+      name)))
+
 (defn munge-symbol [sym]
   (assert (core/symbol? sym) "must be a symbol")
   (str
     (when-some [ns (:namespace sym)]
-      (str ns "."))
-    (:name sym)))
+      (str
+        (join "."
+          (map munge-name
+            (split ns #"\.")))
+        "."))
+    (munge-name (:name sym))))
 
 (defn temp-name [counter]
   (assert (int? counter) "counter must be an integer")

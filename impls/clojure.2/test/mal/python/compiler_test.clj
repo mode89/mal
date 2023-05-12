@@ -275,9 +275,19 @@
           "  l = m"
           "  return n"])))
 
+(deftest munge-name
+  (is (= "foo_bar" (c/munge-name "foo-bar")))
+  (is (= "_PLUS_bar" (c/munge-name "+bar")))
+  (is (= "baz_BANG_" (c/munge-name "baz!")))
+  (is (= "nil_QMARK_" (c/munge-name "nil?")))
+  (is (= "_STAR_ns_STAR_" (c/munge-name "*ns*")))
+  (is (= "_DOLLAR_foo" (c/munge-name "$foo"))))
+
 (deftest munge-symbol
   (is (= "foo" (c/munge-symbol (sym$ "foo"))))
   (is (= "foo.bar.baz" (c/munge-symbol (sym$ "foo.bar/baz"))))
+  (is (= "foo_bar._STAR_baz_STAR_._PLUS_qux_fred_BANG_"
+         (c/munge-symbol (sym$ "foo-bar.*baz*/+qux-fred!"))))
   (is (re-find #"must be a symbol"
         (try (c/munge-symbol "foo")
           (catch Error e (.getMessage e))))))
