@@ -6,10 +6,12 @@
 (deftest core-pr-object
   (is (= (core/pr-object 1 true) "1"))
   (is (= (core/pr-object "1" true) "\"1\""))
-  (is (= (core/pr-object (core/symbol "a") true) "a"))
-  (is (= (core/pr-object [1 "2" (core/symbol "x")] true) "[1 \"2\" x]"))
-  (is (= (core/pr-object (list 1 ["2" (core/symbol "some-symbol")]) true)
-         "(1 [\"2\" some-symbol])"))
+  (is (= "a" (core/pr-object (core/symbol "a") false)))
+  (is (= "a" (core/pr-object (core/symbol "a") true)))
+  (is (= "[1 \"2\" x]" (core/pr-object [1 "2" (core/symbol "x")] true)))
+  (is (= "(1 [\"2\" some-symbol])"
+         (core/pr-object (list 1 ["2" (core/symbol "some-symbol")]) true)))
+  (is (= "foo/bar" (core/pr-object (core/symbol "foo/bar") true)))
   (is (= (core/pr-object "abc\"def" true) "\"abc\\\"def\""))
   (is (= (core/pr-object "a\nb" true) "\"a\\nb\""))
   (is (= (core/pr-object "a\tb" true) "\"a\\tb\""))

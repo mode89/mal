@@ -201,12 +201,7 @@
   (str "globals()[\"" name "\"]"))
 
 (defn- throw-not-found [sym]
-  (core/throw
-    (str "'"
-         (when-some [namespace (:namespace sym)]
-           (str namespace "/"))
-         (:name sym)
-         "' not found")))
+  (core/throw (core/str "'" sym "' not found")))
 
 (defn resolve-symbol-name [ctx sym]
   (assert (core/symbol? sym) "must be a symbol")

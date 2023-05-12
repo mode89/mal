@@ -100,7 +100,10 @@
           (clj/concat [\"] (map -pr-char-readable object) [\"]))
         object)
     (symbol? object)
-      (clj/str (:name object))
+      (clj/str
+        (when-some [ns (:namespace object)]
+          (str ns "/"))
+        (:name object))
     (keyword? object)
       (clj/str \: (:name object))
     (list? object)
@@ -169,12 +172,7 @@
         new-ns))))
 
 (defn- throw-not-found [sym]
-  (mal.core/throw
-    (str "'"
-         (when-some [namespace (:namespace sym)]
-           (str namespace "/"))
-         (:name sym)
-         "' not found")))
+  (mal.core/throw (str "'" sym "' not found")))
 
 (defn resolve-symbol [ctx locals sym]
   (assert (symbol? sym) "must be a symbol")
