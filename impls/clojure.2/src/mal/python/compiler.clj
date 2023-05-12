@@ -369,28 +369,25 @@
             [[:return fbody-res]]))]]
      (assoc ctx3 :locals (:locals ctx))]))
 
-(defn do-quote [x]
+(defn quote-expr [x]
   (cond
-    (nil? x) "None"
-    (boolean? x) (if x "True" "False")
-    (number? x) (str x)
-    (string? x) (core/pr-str x)
-    (core/keyword? x) (str "keyword(\"" (:name x) "\")")
-    (core/symbol? x) (str "symbol(\""
-                          (when-some [ns (:namespace x)]
-                            (str ns "/"))
-                          (:name x)
-                          "\")")
-    (core/list? x) (str "list(" (join ", " (map do-quote x)) ")")
-    (core/vector? x) (str "vector(" (join ", " (map do-quote x)) ")")
-    (core/map? x) (str "hash_map("
-                       (join ", "
-                         (sort
-                           (map (fn [[k v]]
-                                  (str (do-quote k) ", " (do-quote v)))
-                                x)))
-                       ")")
-    (set? x) (str "hash_set(" (join ", " (sort (map do-quote x))) ")")
+    (nil? x) [:value "None"]
+    (boolean? x) [:value (if x "True" "False")]
+    (number? x) [:value (str x)]
+    (string? x) [:value (core/pr-str x)]
+    (core/keyword? x) [:call [:value "keyword"]
+                        [:value (core/pr-str (:name x))]]
+    (core/symbol? x) [:call [:value "symbol"]
+                       [:value (str "\"" (core/pr-str x) "\"")]]
+    (core/list? x) (concat [:call [:value "list"]] (map quote-expr x))
+    (core/vector? x) (concat [:call [:value "vector"]] (map quote-expr x))
+    (core/map? x) (concat [:call [:value "hash_map"]]
+                          (apply concat
+                            (sort
+                              (map (fn [[k v]]
+                                     [(quote-expr k) (quote-expr v)])
+                                   x))))
+    (set? x) (concat [:call [:value "hash_set"]] (sort (map quote-expr x)))
     :else (core/throw
             (str "don't know how to quote this: "
                  (core/pr-str x)))))
@@ -441,7 +438,7 @@
           (core/symbol "quote") (let [value (first args)]
                                   (assert (= 1 (count args))
                                     "quote expects one argument")
-                                  [[:value (do-quote value)] nil ctx])
+                                  [(quote-expr value) nil ctx])
           (transform-call ctx form))))
 
     (core/symbol? form)

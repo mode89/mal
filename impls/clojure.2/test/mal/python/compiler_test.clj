@@ -674,23 +674,47 @@
     (is (= [[:value "3.14"] nil ctx] (c/transform ctx (quote$ 3.14))))
     (is (= [[:value "\"Hello, \\\"World\\\"!\""] nil ctx]
            (c/transform ctx (quote$ "Hello, \"World\"!"))))
-    (is (= [[:value "keyword(\"foo\")"] nil ctx]
+    (is (= [[:call [:value "keyword"] [:value "\"foo\""]] nil ctx]
            (c/transform ctx (quote$ (kw$ "foo")))))
-    (is (= [[:value "symbol(\"foo/bar\")"] nil ctx]
+    (is (= [[:call [:value "symbol"] [:value "\"foo/bar\""]] nil ctx]
            (c/transform ctx (quote$ (sym$ "foo/bar")))))
-    (is (= [[:value "symbol(\"baz\")"] nil ctx]
+    (is (= [[:call [:value "symbol"] [:value "\"baz\""]] nil ctx]
            (c/transform ctx (quote$ (sym$ "baz")))))
-    (is (= [[:value "list()"] nil ctx] (c/transform ctx (quote$ ()))))
-    (is (= [[:value "list(None, 43, \"hello\", symbol(\"qux\"))"] nil ctx]
+    (is (= [[:call [:value "list"]] nil ctx]
+           (c/transform ctx (quote$ (list)))))
+    (is (= [[:call [:value "list"]
+              [:value "None"]
+              [:value "43"]
+              [:value "\"hello\""]
+              [:call [:value "symbol"] [:value "\"qux\""]]]
+            nil ctx]
            (c/transform ctx (quote$ (list nil 43 "hello" (sym$ "qux"))))))
-    (is (= [[:value "vector()"] nil ctx] (c/transform ctx (quote$ []))))
-    (is (= [[:value "vector(None, 43, \"hello\", symbol(\"qux\"))"] nil ctx]
+    (is (= [[:call [:value "vector"]] nil ctx]
+           (c/transform ctx (quote$ []))))
+    (is (= [[:call [:value "vector"]
+              [:value "None"]
+              [:value "43"]
+              [:value "\"hello\""]
+              [:call [:value "symbol"] [:value "\"qux\""]]]
+            nil ctx]
            (c/transform ctx (quote$ [nil 43 "hello" (sym$ "qux")]))))
-    (is (= [[:value "hash_map()"] nil ctx] (c/transform ctx (quote$ {}))))
-    (is (= [[:value "hash_map(\"hello\", symbol(\"qux\"), None, 43)"] nil ctx]
+    (is (= [[:call [:value "hash_map"]] nil ctx]
+           (c/transform ctx (quote$ {}))))
+    (is (= [[:call [:value "hash_map"]
+              [:value "\"hello\""]
+              [:call [:value "symbol"] [:value "\"qux\""]]
+              [:value "None"]
+              [:value "43"]]
+            nil ctx]
            (c/transform ctx (quote$ {nil 43 "hello" (sym$ "qux")}))))
-    (is (= [[:value "hash_set()"] nil ctx] (c/transform ctx (quote$ #{}))))
-    (is (= [[:value "hash_set(\"hello\", 43, None, symbol(\"qux\"))"] nil ctx]
+    (is (= [[:call [:value "hash_set"]] nil ctx]
+           (c/transform ctx (quote$ #{}))))
+    (is (= [[:call [:value "hash_set"]
+              [:value "\"hello\""]
+              [:value "43"]
+              [:value "None"]
+              [:call [:value "symbol"] [:value "\"qux\""]]]
+            nil ctx]
            (c/transform ctx (quote$ #{nil 43 "hello" (sym$ "qux")}))))
     (is (re-find #"quote expects one argument"
           (try (c/transform ctx (list (sym$ "quote")))
