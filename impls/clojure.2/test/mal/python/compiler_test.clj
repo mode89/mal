@@ -281,7 +281,12 @@
   (is (= "baz_BANG_" (c/munge-name "baz!")))
   (is (= "nil_QMARK_" (c/munge-name "nil?")))
   (is (= "_STAR_ns_STAR_" (c/munge-name "*ns*")))
-  (is (= "_DOLLAR_foo" (c/munge-name "$foo"))))
+  (is (= "_DOLLAR_foo" (c/munge-name "$foo")))
+  (is (= "___def" (c/munge-name "def")))
+  (is (= "___global" (c/munge-name "global")))
+  (is (= "___globals" (c/munge-name "globals")))
+  (is (= "___list" (c/munge-name "list")))
+  (is (= "___map" (c/munge-name "map"))))
 
 (deftest munge-symbol
   (is (= "foo" (c/munge-symbol (sym$ "foo"))))

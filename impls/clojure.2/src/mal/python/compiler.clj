@@ -3,6 +3,44 @@
             [clojure.string :refer [join split triml]]
             [mal.core :as core]))
 
+(def SPECIAL-NAMES
+  #{"False"
+    "None"
+    "True"
+    "and"
+    "as"
+    "assert"
+    "break"
+    "class"
+    "continue"
+    "def"
+    "del"
+    "elif"
+    "else"
+    "except"
+    "finally"
+    "for"
+    "from"
+    "global"
+    "globals"
+    "if"
+    "import"
+    "in"
+    "is"
+    "lambda"
+    "list"
+    "map"
+    "nonlocal"
+    "not"
+    "or"
+    "pass"
+    "raise"
+    "return"
+    "try"
+    "while"
+    "with"
+    "yield"})
+
 (def MUNGE-MAP
   {\- "_"
    \. "_DOT_"
@@ -211,13 +249,18 @@
 
 (defn munge-name [name]
   (assert (string? name))
-  (apply str
-    (map
-      (fn [c]
-        (if (contains? MUNGE-MAP c)
-          (get MUNGE-MAP c)
-          c))
-      name)))
+  (cond
+    (contains? SPECIAL-NAMES name)
+    (str "___" name)
+
+    :else
+    (apply str
+      (map
+        (fn [c]
+          (if (contains? MUNGE-MAP c)
+            (get MUNGE-MAP c)
+            c))
+        name))))
 
 (defn munge-symbol [sym]
   (assert (core/symbol? sym) "must be a symbol")
