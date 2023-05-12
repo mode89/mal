@@ -36,10 +36,18 @@
     "pass"
     "raise"
     "return"
+    "set"
+    "str"
     "try"
     "while"
     "with"
     "yield"})
+
+(defn munge-special-name [name]
+  (assert (string? name))
+  (str "___" name))
+
+(def RESERVED-NAMES (set (map munge-special-name SPECIAL-NAMES)))
 
 (def MUNGE-MAP
   {\- "_"
@@ -251,7 +259,10 @@
   (assert (string? name))
   (cond
     (contains? SPECIAL-NAMES name)
-    (str "___" name)
+    (munge-special-name name)
+
+    (contains? RESERVED-NAMES name)
+    (core/throw (str "name '" name "' is reserved"))
 
     :else
     (apply str

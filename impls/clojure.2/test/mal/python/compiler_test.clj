@@ -286,7 +286,15 @@
   (is (= "___global" (c/munge-name "global")))
   (is (= "___globals" (c/munge-name "globals")))
   (is (= "___list" (c/munge-name "list")))
-  (is (= "___map" (c/munge-name "map"))))
+  (is (= "___map" (c/munge-name "map")))
+  (is (= "___set" (c/munge-name "set")))
+  (is (= "___str" (c/munge-name "str")))
+  (is (re-find #"name '___map' is reserved"
+        (try (c/munge-name "___map")
+          (catch Exception e (core/object-exception-unwrap e)))))
+  (is (re-find #"name '___str' is reserved"
+        (try (c/munge-name "___str")
+          (catch Exception e (core/object-exception-unwrap e))))))
 
 (deftest munge-symbol
   (is (= "foo" (c/munge-symbol (sym$ "foo"))))
