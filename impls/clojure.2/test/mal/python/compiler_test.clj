@@ -138,13 +138,13 @@
 (deftest emit
   (is (= (c/emit [:assign "a" [:value "b"]]) ["a = b"]))
   (is (= (c/emit [:call [:value "foo"]
-                   [[:value "a"] [:value "b"]]
+                   [:value "a"] [:value "b"]
                    {"c" [:value "42"]}])
          ["foo(a, b, c=42)"]))
   (is (= (c/emit [:block
                    [:assign "a" [:value "b"]]
                    [:call [:value "foo"]
-                     [[:value "a"] [:value "b"]]
+                     [:value "a"] [:value "b"]
                      {"c" [:value "42"]}]])
          ["a = b"
           "foo(a, b, c=42)"]))
@@ -176,18 +176,18 @@
   (is (= (c/emit [:if [:value "cond1"]
                    [:block
                      [:assign "a" [:value "b"]]
-                     [:call [:value "foo"] [[:value "a"] [:value "b"]] {}]]
+                     [:call [:value "foo"] [:value "a"] [:value "b"]]]
                    [[[:value "cond2"]
                        [:block
                          [:assign "f" [:value "g"]]
                          [:assign "h" [:value "i"]]]]
                     [[:value "cond3"]
                        [:block
-                         [:call [:value "baz"] [[:value "j"] [:value "k"]] {}]
+                         [:call [:value "baz"] [:value "j"] [:value "k"]]
                          [:assign "l" [:value "m"]]]]]
                    [:block
                      [:call [:value "bar"]
-                       [[:value "x"] [:value "y"]]
+                       [:value "x"] [:value "y"]
                        {"z" [:value "42"]}]
                      [:assign "p" [:value "q"]]]])
          ["if cond1:"
@@ -210,7 +210,7 @@
                    [:block
                      [:assign "b" [:value "c"]]
                      [:if [:call [:value "foo"]
-                            [[:value "a"] [:value "b"]]
+                            [:value "a"] [:value "b"]
                             {"c" [:value "42"]}]
                        [:block
                          [:break]]
@@ -244,7 +244,7 @@
                    [:block
                      [:assign "a" [:value "b"]]
                      [:call [:value "foo"]
-                       [[:value "a"] [:value "b"]]
+                       [:value "a"] [:value "b"]
                        {"c" [:value "42"]}]]
                    [["Exception" nil
                       [:block
@@ -445,12 +445,12 @@
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
-    (is (= [[:call (c/temp-name 0) nil {}]
+    (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block [:return [:value "None"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx (list (sym$ "let*") []))))
-    (is (= [[:call (c/temp-name 0) nil {}]
+    (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
                  [:assign "a" [:value "42"]]
@@ -459,7 +459,7 @@
            (c/transform ctx
              (let$ [(sym$ "a") 42]
                (sym$ "a")))))
-    (is (= [[:call (c/temp-name 0) nil {}]
+    (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
                  [:assign (c/globals "b") [:value "42"]]
@@ -478,7 +478,7 @@
                (do$
                  (sym$ "a")
                  (sym$ "c"))))))
-    (is (= [[:call (c/temp-name 0) nil {}]
+    (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
                  [:assign "a" [:value "42"]]
@@ -704,25 +704,24 @@
               :ns-registry {"foo" #{"bar" "baz"}}
               :current-ns "foo"
               :locals #{"qux"})]
-    (is (= [[:call [:value "foo.bar"] [] {}] [] ctx]
+    (is (= [[:call [:value "foo.bar"]] [] ctx]
            (c/transform ctx (list (sym$ "foo/bar")))))
     (is (= [[:call [:value "baz"]
-              [[:value "1"] [:value "2"] [:value "3"]] {}]
+              [:value "1"] [:value "2"] [:value "3"]]
             []
             ctx]
            (c/transform ctx (list (sym$ "baz") 1 2 3))))
     (is (= [[:call [:value "qux"]
-              [[:value "\"hello\""] [:value "a"] [:value "bar"]]
-              {}]
+              [:value "\"hello\""] [:value "a"] [:value "bar"]]
             [[:assign (c/globals "a") [:value "43"]]]
             (update-in ctx [:ns-registry (sym$ "foo") :bindings]
               conj (sym$ "a"))]
            (c/transform ctx
              (list (sym$ "qux") "hello" (def$ "a" 43) (sym$ "bar")))))
-    (is (= [[:call (c/temp-name 0) [[:value "b"]] {}]
+    (is (= [[:call (c/temp-name 0) [:value "b"]]
             [[:assign (c/globals "a") [:value "1"]]
              [:assign (c/temp-name 0)
-               [:call [:value "bar"] [[:value "a"]] {}]]
+               [:call [:value "bar"] [:value "a"]]]
              [:assign (c/globals "b") [:value "2"]]]
             (-> ctx
                 (update-in [:ns-registry (sym$ "foo") :bindings]

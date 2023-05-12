@@ -123,18 +123,22 @@
       :assign (let [[name value] (rest ast)]
                 (assert (expression? value))
                 (emit-assign name (first (emit value))))
-      :call (let [[name args] (rest ast)]
+      :call (let [[name & args] (rest ast)
+                  [pargs kwargs] (let [kwargs (last args)]
+                                   (if (map? kwargs)
+                                     [(butlast args) kwargs]
+                                     [args {}]))]
               (assert (expression? name))
               (emit-call (first (emit name))
                 (map (fn [arg]
                        (assert (expression? arg))
                        (first (emit arg)))
-                     args)
+                     pargs)
                 (into {}
                   (map (fn [[k v]]
                          (assert (expression? v))
-                         [k (first (emit v))]))
-                    kwargs)))
+                         [k (first (emit v))])
+                       kwargs))))
       :value (let [value (second ast)]
                (assert (string? value))
                [value])
@@ -285,7 +289,7 @@
             "let* expects even number of forms in bindings")
     (assert (> 3 (count args))
             "let* expects only one form in body")
-    [[:call temp-func nil {}]
+    [[:call temp-func]
      [[:def temp-func []
         temp-func-body]]
      ctx3]))
@@ -405,11 +409,11 @@
            args-do []]
       (if (empty? args)
         (if (= :value (first head-res))
-          [[:call head-res args-res {}]
+          [(concat [:call head-res] args-res)
            (concat head-do args-do)
            ctx*]
           (let [[head-res-temp ctx**] (gen-temp-name ctx*)]
-            [[:call head-res-temp args-res {}]
+            [(concat [:call head-res-temp] args-res)
              (concat
                head-do
                [[:assign head-res-temp head-res]]
