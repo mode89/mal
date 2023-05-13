@@ -2,7 +2,9 @@
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
             [mal.python.compiler :as c]
-            [mal.test.utils :refer [def$ do$ if$ kw$ fn$ let$ quote$ sym$]]))
+            [mal.reader :as r]
+            [mal.test.utils :refer [def$ do$ if$ kw$ fn$ let$ qq$ quote$
+                                    spunq$ sym$ unq$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -783,3 +785,134 @@
                 (assoc :counter 1))]
            (c/transform ctx
              (list (list (sym$ "bar") (def$ "a" 1)) (def$ "b" 2)))))))
+
+(deftest transform-quasiquote
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"bar"
+                                    "baz"
+                                    "concat"
+                                    "list"
+                                    "symbol"
+                                    "vec"
+                                    "vector"}}
+              :current-ns "foo"
+              :locals #{"qux"})]
+    (is (= [[:value "None"] nil ctx] (c/transform ctx (qq$ nil))))
+    (is (= [[:call [:value "symbol"] [:value "\"a\""]] nil ctx]
+           (c/transform ctx (qq$ (sym$ "a")))))
+    (is (= [[:value "bar"] nil ctx]
+           (c/transform ctx (qq$ (unq$ (sym$ "bar"))))))
+    (is (= [[:call [:value "concat"] [:value "baz"]] [] ctx]
+           (c/transform ctx (qq$ (list (spunq$ (sym$ "baz")))))))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "___list"]
+                [:value "42"]
+                [:call [:value "symbol"] [:value "\"x\""]]]
+              [:value "qux"]]
+            [] ctx]
+           (c/transform ctx
+             (qq$ (list 42 (sym$ "x") (spunq$ (sym$ "qux")))))))
+    (is (= [[:call [:value "concat"]
+              [:value "bar"]
+              [:call [:value "___list"]
+                [:call [:value "symbol"] [:value "\"fred\""]]
+                [:value "42"]]]
+            [] ctx]
+           (c/transform ctx
+             (qq$ (list (spunq$ (sym$ "bar")) (sym$ "fred") 42)))))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "___list"]
+                [:value "1"]
+                [:call [:value "concat"]
+                  [:value "qux"]
+                  [:call [:value "___list"] [:value "2"]]]]]
+            [] ctx]
+           (c/transform ctx
+             (qq$ (list 1 (list (spunq$ (sym$ "qux")) 2))))
+           ))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "___list"] [:value "bar"] [:value "42"]]
+              [:value "baz"]]
+            [] ctx]
+           (c/transform ctx
+             (qq$ (list (unq$ (sym$ "bar")) 42 (spunq$ (sym$ "baz")))))
+           ))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "vector"]
+                [:value "1"]
+                [:value "2"]
+                [:call [:value "concat"]
+                  [:call [:value "___list"]
+                    [:value "3"]
+                    [:value "4"]]]]]
+            [] ctx]
+           (c/transform ctx
+             (r/read-string "`(~@(vector 1 2 `(~@(list 3 4))))"))))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "___list"]
+                [:value "42"]
+                [:call [:value "concat"]
+                  [:call [:value "___list"] [:value "43"]]
+                  [:value "bar"]]]
+              [:value "baz"]]
+            [[:value "1"]
+             [:value "2"]]
+            ctx]
+           (c/transform ctx
+             (r/read-string "`(42 (43 ~@(do 1 bar)) ~@(do 2 baz))"))))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "___list"]
+                [:call [:value "concat"]
+                  [:call [:value "___list"] [:value "bar"]]
+                  [:value "x"]]]
+              [:value "x"]]
+            [[:value "1"]
+             [:assign (c/globals "x") [:value "2"]]
+             [:value "3"]]
+            (update-in ctx [:ns-registry (sym$ "foo") :bindings]
+              conj (sym$ "x"))]
+           (c/transform ctx
+             (r/read-string "`((~bar ~@(do 1 (def! x 2))) ~@(do 3 x))"))))
+    (is (= [[:call [:value "concat"]
+              [:call [:value "___list"]
+                [:value "1"]
+                [:value "qux"]
+                [:value "2"]]
+              [:value "bar"]
+              [:value "baz"]]
+            [] ctx]
+           (c/transform ctx
+             (qq$ (list 1 (unq$ (sym$ "qux")) 2
+                        (spunq$ (sym$ "bar"))
+                        (spunq$ (sym$ "baz")))))))
+    (is (= [[:call [:value "vec"]
+              [:call [:value "concat"]
+                [:call [:value "___list"]
+                  [:value "1"]
+                  [:value "qux"]
+                  [:value "2"]]
+                [:value "bar"]
+                [:value "baz"]]]
+            [] ctx]
+           (c/transform ctx
+             (qq$ (vector 1 (unq$ (sym$ "qux")) 2
+                          (spunq$ (sym$ "bar"))
+                          (spunq$ (sym$ "baz")))))))
+    (is (re-find #"unquote expects exactly one argument"
+          (try (c/transform ctx
+                 (qq$ (list (sym$ "unquote") (sym$ "bar") (sym$ "baz"))))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"splice-unquote expects exactly one argument"
+          (try (c/transform ctx
+                 (qq$ (list (list (sym$ "splice-unquote")
+                                  (sym$ "bar")
+                                  (sym$ "baz")))))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"splice-unquote used outside of list context"
+          (try (c/transform ctx
+                 (qq$ (spunq$ (sym$ "bar"))))
+            (catch Exception e (core/object-exception-unwrap e)))))
+    (is (re-find #"quasiquote expects exactly one argument"
+          (try (c/transform ctx
+                 (list (sym$ "quasiquote") (sym$ "bar") (sym$ "baz")))
+            (catch Error e (.getMessage e)))))))

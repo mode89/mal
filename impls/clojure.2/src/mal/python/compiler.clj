@@ -499,6 +499,67 @@
             (str "don't know how to quote this: "
                  (core/pr-str x)))))
 
+(declare transform-quasiquote)
+
+(defn transform-quasiquote-list [ctx form]
+  (let [concat$ (resolve-symbol-name ctx (core/symbol "concat"))
+        list$ (resolve-symbol-name ctx (core/symbol "list"))
+        splice-unquote? (fn [element]
+                          (and (list? element)
+                               (= (core/symbol "splice-unquote")
+                                  (first element))))
+        ; Split the form into segments, where each segment is either
+        ; a splice-unquote or a list of consecutive elements that are
+        ; not splice-unquotes.
+        segments (mapcat (fn [segment]
+                           (if (splice-unquote? (first segment))
+                             segment
+                             (list segment)))
+                   (partition-by splice-unquote? form))]
+      (reduce
+        (fn [[result body ctx2] segment]
+          (if (splice-unquote? segment)
+            (let [unquoted (second segment)
+                  [ures ubody ctx3] (transform ctx2 unquoted)]
+              (assert (= (count segment) 2)
+                "splice-unquote expects exactly one argument")
+              [(conj result ures)
+               (concat body ubody)
+               ctx3])
+            (reduce
+              (fn [[result* body* ctx4] element]
+                (let [[eres ebody ctx5] (transform-quasiquote ctx4 element)]
+                  [(conj (pop result*) (conj (peek result*) eres))
+                   (concat body* ebody)
+                   ctx5]))
+              [(conj result [:call [:value list$]]) body ctx2]
+              segment)))
+        [[:call [:value concat$]] [] ctx]
+        segments)))
+
+(defn transform-quasiquote [ctx form]
+  (cond
+    (list? form)
+    (cond
+      (= (core/symbol "unquote") (first form))
+      (let [unquoted (second form)]
+        (assert (= (count form) 2) "unquote expects exactly one argument")
+        (transform ctx unquoted))
+
+      (= (core/symbol "splice-unquote") (first form))
+      (core/throw "splice-unquote used outside of list context")
+
+      :else
+      (transform-quasiquote-list ctx form))
+
+    (vector? form)
+    (let [vec$ (resolve-symbol-name ctx (core/symbol "vec"))
+          [res body ctx*] (transform-quasiquote-list ctx form)]
+      [[:call [:value vec$] res] body ctx*])
+
+    :else
+    [(quote-expr ctx form) nil ctx]))
+
 (defn transform-call [ctx form]
   (let [head (first form)
         [head-res head-do ctx2] (transform ctx head)]
@@ -546,6 +607,11 @@
                                   (assert (= 1 (count args))
                                     "quote expects one argument")
                                   [(quote-expr ctx value) nil ctx])
+          (core/symbol "quasiquote") (let [form* (first args)]
+                                       (assert (= 1 (count args))
+                                         (str "quasiquote expects exactly "
+                                              "one argument"))
+                                       (transform-quasiquote ctx form*))
           (transform-call ctx form))))
 
     (core/symbol? form)
