@@ -594,7 +594,7 @@
   (cond
     (list? form)
     (if (empty? form)
-      [[:value "list()"] nil ctx]
+      [[:call (resolve-symbol-name ctx (core/symbol "list"))] nil ctx]
       (let [head (first form)
             args (rest form)]
         (condp = head
