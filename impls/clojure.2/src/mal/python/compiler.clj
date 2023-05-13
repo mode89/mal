@@ -617,11 +617,11 @@
     (core/symbol? form)
     [[:value (resolve-symbol-name ctx form)] nil ctx]
 
-    (nil? form)
-    [[:value "None"] nil ctx]
+    (vector? form)
+    (core/throw "not impelemented")
 
-    (boolean? form)
-    [[:value (if form "True" "False")] nil ctx]
+    (map? form)
+    (core/throw "not implemented")
 
     :else
-    [[:value (pr-str form)] nil ctx]))
+    [(quote-expr ctx form) nil ctx]))
