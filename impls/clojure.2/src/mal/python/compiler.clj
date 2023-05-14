@@ -348,6 +348,27 @@
          [:ns-registry current-ns :bindings]
          conj name)])))
 
+(defn transform-defmacro [ctx args]
+  (let [name (first args)
+        f (second args)]
+    (assert (= (count args) 2) "defmacro! expects exactly 2 arguments")
+    (assert (core/symbol? name)
+      "defmacro! expects a symbol as the first argument")
+    (assert (and (list? f) (= (core/symbol "fn*") (first f)))
+      "defmacro! expects fn* as the second argument")
+    (let [[res body ctx*] (transform ctx f)
+          name-munged (munge-symbol name)
+          current-ns (:current-ns ctx)]
+      (assert (some? current-ns) "no current namespace")
+      [[:value name-munged]
+       (conj body
+         [:assign (globals name-munged) res]
+         [:call [:value "setattr"]
+           [:value name-munged] [:value "___is_mal_macro"] [:value "True"]])
+       (update-in ctx*
+         [:ns-registry current-ns :bindings]
+         conj name)])))
+
 (defn make-let-func [ctx bindings body]
   (loop [bindings* bindings
          fbody [:block]
@@ -602,6 +623,7 @@
             args (rest form)]
         (condp = head
           (core/symbol "def!") (transform-def ctx args)
+          (core/symbol "defmacro!") (transform-defmacro ctx args)
           (core/symbol "let*") (transform-let ctx args)
           (core/symbol "do") (transform-do ctx args)
           (core/symbol "if") (transform-if ctx args)

@@ -3,8 +3,8 @@
             [mal.core :as core]
             [mal.python.compiler :as c]
             [mal.reader :as r]
-            [mal.test.utils :refer [def$ do$ if$ kw$ fn$ let$ qq$ quote$
-                                    spunq$ sym$ unq$]]))
+            [mal.test.utils :refer [def$ defmacro$ do$ if$ kw$ fn$ let$ qq$
+                                    quote$ spunq$ sym$ unq$]]))
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -919,3 +919,38 @@
           (try (c/transform ctx
                  (list (sym$ "quasiquote") (sym$ "bar") (sym$ "baz")))
             (catch Error e (.getMessage e)))))))
+
+(deftest transform-defmacro
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{}}
+              :current-ns "foo")
+        temp0 (c/temp-name 0)]
+    (is (= [[:value "bar"]
+            [[:def temp0 []
+               [:block
+                 [:return [:value "None"]]]]
+             [:assign (c/globals "bar") [:value temp0]]
+             [:call [:value "setattr"]
+               [:value "bar"] [:value "___is_mal_macro"] [:value "True"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar"}}
+              :current-ns "foo"
+              :counter 1)]
+           (c/transform ctx (defmacro$ "bar" (fn$ [])))))
+    (is (re-find #"defmacro! expects exactly 2 arguments"
+          (try (c/transform ctx (list (sym$ "defmacro!") (sym$ "baz")))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"defmacro! expects exactly 2 arguments"
+          (try (c/transform ctx
+                 (list (sym$ "defmacro!") (sym$ "baz") (fn$ []) 42))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"defmacro! expects a symbol as the first argument"
+          (try (c/transform ctx (list (sym$ "defmacro!") "bar" (fn$ [])))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"defmacro! expects fn\* as the second argument"
+          (try (c/transform ctx (list (sym$ "defmacro!") (sym$ "bar") 42))
+            (catch Error e (.getMessage e))))))
+  (is (re-find #"no current namespace"
+        (try (c/transform (mock-compile-context)
+               (defmacro$ "bar" (fn$ [])))
+          (catch Error e (.getMessage e))))))
