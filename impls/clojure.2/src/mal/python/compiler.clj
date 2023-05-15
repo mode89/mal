@@ -343,7 +343,9 @@
           current-ns (:current-ns ctx)]
       (assert (some? current-ns) "no current namespace")
       [[:value (munge-symbol name)]
-       (conj val-body [:assign (globals (munge-symbol name)) val-expr])
+       (concat
+         val-body
+         [[:assign (globals (munge-symbol name)) val-expr]])
        (update-in ctx2
          [:ns-registry current-ns :bindings]
          conj name)])))
@@ -361,10 +363,13 @@
           current-ns (:current-ns ctx)]
       (assert (some? current-ns) "no current namespace")
       [[:value name-munged]
-       (conj body
-         [:assign (globals name-munged) res]
-         [:call [:value "setattr"]
-           [:value name-munged] [:value "___is_mal_macro"] [:value "True"]])
+       (concat
+         body
+         [[:assign (globals name-munged) res]
+          [:call [:value "setattr"]
+            [:value name-munged]
+            [:value "___is_mal_macro"]
+            [:value "True"]]])
        (update-in ctx*
          [:ns-registry current-ns :bindings]
          conj name)])))

@@ -418,7 +418,15 @@
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo")]
-           (c/transform ctx (def$ "bar" 42)))))
+           (c/transform ctx (def$ "bar" 42))))
+    (is (= [[:value "qux"]
+            [[:value "1"]
+             [:assign (c/globals "qux") [:value "2"]]]
+            (update-in ctx [:ns-registry (sym$ "foo") :bindings]
+              conj (sym$ "qux"))]
+           (c/transform ctx
+             (def$ "qux"
+               (do$ 1 2))))))
   (is (re-find #"def! expects a symbol as the first argument"
         (try (c/transform
                (mock-compile-context
