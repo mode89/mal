@@ -609,6 +609,48 @@
                  (conj args-res arg-res)
                  (concat args-do arg-do)))))))
 
+(defn transform-try [ctx args]
+  (let [catch-form? (fn [form]
+                      (and (list? form)
+                           (= (core/symbol "catch*") (first form))))
+        [try-expr catch-form] (case (count args)
+                                0 [nil nil]
+                                1 (let [arg (first args)]
+                                    (if (catch-form? arg)
+                                      [nil arg]
+                                      [arg nil]))
+                                2 (do (assert (catch-form? (second args))
+                                        (str "try* expects catch* as "
+                                             "the second argument"))
+                                      [(first args) (second args)])
+                                (core/throw
+                                  "try* expects at most 2 arguments"))]
+    (if (some? catch-form)
+      (let [ex-binding (second catch-form)
+            _ (assert (core/symbol? ex-binding)
+                "exception object must be a symbol")
+            _ (assert (<= (count catch-form) 3)
+                "catch* expects at most 2 arguments")
+            catch-expr (nth catch-form 2 nil)
+            [result ctx2] (gen-temp-name ctx)
+            [tres tbody ctx3] (transform ctx2 try-expr)
+            [cres cbody ctx4] (transform
+                                (update ctx3 :locals conj ex-binding)
+                                catch-expr)]
+        [[:value result]
+         [[:try
+            (cons :block
+              (concat
+                tbody
+                [[:assign [:value result] tres]]))
+            [["Exception" (munge-symbol ex-binding)
+               (cons :block
+                 (concat
+                   cbody
+                   [[:assign [:value result] cres]]))]]]]
+         (assoc ctx4 :locals (:locals ctx))])
+      (transform ctx try-expr))))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -637,6 +679,8 @@
                                          (str "quasiquote expects exactly "
                                               "one argument"))
                                        (transform-quasiquote ctx form*))
+          (core/symbol "try*") (transform-try ctx args)
+          (core/symbol "catch*") (core/throw "catch* used outside of try*")
           (transform-call ctx form))))
 
     (core/symbol? form)

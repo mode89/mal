@@ -954,3 +954,108 @@
         (try (c/transform (mock-compile-context)
                (defmacro$ "bar" (fn$ [])))
           (catch Error e (.getMessage e))))))
+
+(deftest transform-try
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"bar"}}
+              :current-ns "foo")
+        temp0 (c/temp-name 0)]
+    (is (= [[:value "None"] nil ctx]
+           (c/transform ctx (list (sym$ "try*")))))
+    (is (= [[:value "bar"] nil ctx]
+           (c/transform ctx
+             (list (sym$ "try*") (sym$ "bar")))))
+    (is (= [[:value temp0]
+            [[:try
+               [:block
+                 [:assign [:value temp0] [:value "None"]]]
+               [["Exception" "ex"
+                  [:block
+                    [:assign [:value temp0] [:value "ex"]]]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx
+             (list (sym$ "try*")
+               (list (sym$ "catch*") (sym$ "ex")
+                 (sym$ "ex"))))))
+    (is (= [[:value temp0]
+            [[:try
+               [:block [:assign [:value temp0] [:value "None"]]]
+               [["Exception" "x"
+                  [:block [:assign [:value temp0] [:value "None"]]]]]]]
+            (assoc ctx :counter 1)]
+           (c/transform ctx
+             (list (sym$ "try*")
+               (list (sym$ "catch*") (sym$ "x"))))))
+    (is (= [[:value temp0]
+            [[:try
+               [:block
+                 [:assign (c/globals "a") [:value "1"]]
+                 [:value "a"]
+                 [:assign (c/globals "b") [:value "2"]]
+                 [:assign [:value temp0] [:value "b"]]]
+               [["Exception" "exc"
+                  [:block
+                    [:assign (c/globals "c") [:value "exc"]]
+                    [:value "c"]
+                    [:assign [:value temp0] [:value "bar"]]]]]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar" "a" "b" "c"}}
+              :current-ns "foo"
+              :counter 1)]
+           (c/transform ctx
+             (list (sym$ "try*")
+               (do$ (def$ "a" 1)
+                    (def$ "b" 2))
+               (list (sym$ "catch*") (sym$ "exc")
+                 (do$ (def$ "c" (sym$ "exc"))
+                      (sym$ "bar")))))))
+    (is (= [[:value temp0]
+            [[:try
+               [:block
+                 [:assign (c/globals "x") [:value "42"]]
+                 [:assign [:value temp0] [:value "x"]]]
+               [["Exception" "exc"
+                  [:block
+                    [:assign [:value temp0] [:value "x"]]]]]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar" "x"}}
+              :current-ns "foo"
+              :counter 1)]
+           (c/transform ctx
+             (list (sym$ "try*")
+               (def$ "x" 42)
+               (list (sym$ "catch*") (sym$ "exc")
+                 (sym$ "x"))))))
+    (is (re-find #"try\* expects catch\* as the second argument"
+          (try (c/transform ctx
+                 (list (sym$ "try*") 1 2))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"try\* expects at most 2 arguments"
+          (try (c/transform ctx
+                  (list (sym$ "try*")
+                    42
+                    (list (sym$ "catch*") (sym$ "ex1") (sym$ "ex1"))
+                    (list (sym$ "catch*") (sym$ "ex2") (sym$ "ex2"))))
+            (catch Exception e (core/object-exception-unwrap e)))))
+    (is (re-find #"exception object must be a symbol"
+          (try (c/transform ctx
+                 (list (sym$ "try*") 42
+                   (list (sym$ "catch*") "ex" (sym$ "ex"))))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"catch\* expects at most 2 arguments"
+          (try (c/transform ctx
+                 (list (sym$ "try*") 42
+                   (list (sym$ "catch*") (sym$ "ex")
+                     (sym$ "ex")
+                     (sym$ "ex"))))
+            (catch Error e (.getMessage e)))))
+    (is (re-find #"catch\* used outside of try\*"
+          (try (c/transform ctx
+                 (list (sym$ "catch*") (sym$ "ex") 42))
+            (catch Exception e (core/object-exception-unwrap e)))))
+    (is (re-find #"catch\* used outside of try\*"
+          (try (c/transform ctx
+                 (list (sym$ "try*")
+                   (list (sym$ "catch*") (sym$ "ex1") (sym$ "ex1"))
+                   (list (sym$ "catch*") (sym$ "ex2") (sym$ "ex2"))))
+            (catch Exception e (core/object-exception-unwrap e)))))))
