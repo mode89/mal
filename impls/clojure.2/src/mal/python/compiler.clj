@@ -429,9 +429,7 @@
   (let [[result ctx2] (gen-temp-name ctx)
         [cond cond-body ctx3] (transform ctx2 (first args))
         [then then-body ctx4] (transform ctx3 (second args))
-        [else else-body ctx5] (transform ctx4
-                                (when (> (count args) 2)
-                                  (nth args 2)))]
+        [else else-body ctx5] (transform ctx4 (nth args 2 nil))]
     (assert (> (count args) 1) "if expects at least 2 arguments")
     (assert (< (count args) 4) "if expects at most 3 arguments")
     [[:value result]
