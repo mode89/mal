@@ -493,38 +493,33 @@
      (assoc ctx3 :locals (:locals ctx))]))
 
 (defn quote-expr [ctx x]
-  (cond
-    (nil? x) [:value "None"]
-    (boolean? x) [:value (if x "True" "False")]
-    (number? x) [:value (core/str x)]
-    (string? x) [:value (core/pr-str x)]
-    (core/keyword? x) [:call [:value (resolve-symbol-name ctx
-                                       (core/symbol "keyword"))]
-                        [:value (core/pr-str (:name x))]]
-    (core/symbol? x) [:call
-                       [:value (resolve-symbol-name ctx
-                                 (core/symbol "symbol"))]
-                       [:value (core/str "\"" x "\"")]]
-    (list? x) (concat [:call [:value (resolve-symbol-name ctx
-                                       (core/symbol "list"))]]
-                      (map #(quote-expr ctx %) x))
-    (core/vector? x) (concat [:call [:value (resolve-symbol-name ctx
-                                              (core/symbol "vector"))]]
-                             (map #(quote-expr ctx %) x))
-    (core/map? x) (concat [:call [:value (resolve-symbol-name ctx
-                                           (core/symbol "hash-map"))]]
-                          (apply concat
-                            (sort
-                              (map (fn [[k v]]
-                                     [(quote-expr ctx k)
-                                      (quote-expr ctx v)])
-                                   x))))
-    (set? x) (concat [:call [:value (resolve-symbol-name ctx
-                                      (core/symbol "hash-set"))]]
-                     (sort (map #(quote-expr ctx %) x)))
-    :else (core/throw
-            (str "don't know how to quote this: "
-                 (core/pr-str x)))))
+  (let [resolve* (fn [name]
+                   (resolve-symbol-name ctx (core/symbol name)))]
+    (cond
+      (nil? x) [:value "None"]
+      (boolean? x) [:value (if x "True" "False")]
+      (number? x) [:value (core/str x)]
+      (string? x) [:value (core/pr-str x)]
+      (core/keyword? x) [:call [:value (resolve* "keyword")]
+                          [:value (core/pr-str (:name x))]]
+      (core/symbol? x) [:call [:value (resolve* "symbol")]
+                         [:value (core/str "\"" x "\"")]]
+      (list? x) (concat [:call [:value (resolve* "list")]]
+                        (map #(quote-expr ctx %) x))
+      (core/vector? x) (concat [:call [:value (resolve* "vector")]]
+                               (map #(quote-expr ctx %) x))
+      (core/map? x) (concat [:call [:value (resolve* "hash-map")]]
+                            (apply concat
+                              (sort
+                                (map (fn [[k v]]
+                                       [(quote-expr ctx k)
+                                        (quote-expr ctx v)])
+                                     x))))
+      (set? x) (concat [:call [:value (resolve* "hash-set")]]
+                       (sort (map #(quote-expr ctx %) x)))
+      :else (core/throw
+              (str "don't know how to quote this: "
+                   (core/pr-str x))))))
 
 (defn transform-call [ctx form]
   (let [head (first form)
