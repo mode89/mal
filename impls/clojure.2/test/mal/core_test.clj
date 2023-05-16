@@ -4,7 +4,7 @@
             [mal.test.utils :refer [is-list? is-vector? mock-eval-context
                                     sample-eval-context sym$ kw$ quote$ qq$
                                     unq$ spunq$ def$ let$ if$ fn$ defmacro$
-                                    do$ concat$ try$ throw$]])
+                                    do$ concat$ list$ try$ throw$]])
   (:import [mal.types Function Keyword Namespace]))
 
 (def common-bindings
@@ -406,21 +406,22 @@
   (is (= (quote$ (sym$ "foo")) (core/expand-quasiquote (sym$ "foo"))))
   (is (= (concat$) (core/expand-quasiquote (list))))
   (is (= 42 (core/expand-quasiquote (unq$ 42))))
-  (is (= (concat$ (list 42)) (core/expand-quasiquote (list 42))))
-  (is (= (concat$ (list 1 2)) (core/expand-quasiquote (list 1 2))))
+  (is (= (sym$ "foo") (core/expand-quasiquote (unq$ (sym$ "foo")))))
+  (is (= (concat$ (list$ 42)) (core/expand-quasiquote (list 42))))
+  (is (= (concat$ (list$ 1 2)) (core/expand-quasiquote (list 1 2))))
   (is (= (concat$ (sym$ "foo"))
          (core/expand-quasiquote (list (spunq$ (sym$ "foo"))))))
-  (is (= (concat$ (list 42) (sym$ "foo"))
+  (is (= (concat$ (list$ 42) (sym$ "foo"))
          (core/expand-quasiquote (list 42 (spunq$ (sym$ "foo"))))))
-  (is (= (concat$ (sym$ "foo") (list 42))
+  (is (= (concat$ (sym$ "foo") (list$ 42))
          (core/expand-quasiquote (list (spunq$ (sym$ "foo")) 42))))
-  (is (re-find #"unquote expects only one argument"
+  (is (re-find #"unquote expects exactly one argument"
         (try (core/expand-quasiquote (list (sym$ "unquote") 1 2))
           (catch Error e (.getMessage e)))))
   (is (re-find #"splice-unquote used outside of list context"
         (try (core/expand-quasiquote (list (sym$ "splice-unquote") 1))
           (catch Exception e (core/object-exception-unwrap e)))))
-  (is (re-find #"splice-unquote expects only one argument"
+  (is (re-find #"splice-unquote expects exactly one argument"
         (try (core/expand-quasiquote
                (list (list (sym$ "splice-unquote") 1 2)))
           (catch Error e (.getMessage e))))))

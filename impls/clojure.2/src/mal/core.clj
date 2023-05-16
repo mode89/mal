@@ -12,6 +12,7 @@
 
 (declare apply)
 (declare atom)
+(declare concat)
 (declare cons)
 (declare deref)
 (declare eval)
@@ -248,49 +249,60 @@
         (cons (fn-env-bindings env-template args)
               locals)))))
 
-(defn expand-quasiquote [ast]
-  (if (list? ast)
+(declare expand-quasiquote)
+
+(defn expand-quasiquote-list [form]
+  (let [splice-unquote? (fn [element]
+                          (and (list? element)
+                               (= (symbol "splice-unquote")
+                                  (first element))))]
+    (apply list ; form must be stored as a list
+      (cons
+        (symbol "concat")
+        (mapcat
+          (fn [segment]
+            (if (splice-unquote? (first segment))
+              (map
+                (fn [element]
+                  (assert (= (count element) 2)
+                          "splice-unquote expects exactly one argument")
+                  (second element))
+                segment)
+              (list ; this list is for preventing mapcat from flattening
+                (apply list ; form must stored as a list
+                  (cons
+                    ; when macroexpanding, this sequence will be converted
+                    ; to a list, to be consumed by concat
+                    (symbol "list")
+                    (map expand-quasiquote segment))))))
+          (partition-by splice-unquote? form))))))
+
+(defn expand-quasiquote [form]
+  (cond
+    (list? form)
     (cond
-      (= (first ast) (symbol "unquote"))
-      (let [unquoted (second ast)]
-        (assert (= (count ast) 2) "unquote expects only one argument")
+      (= (symbol "unquote") (first form))
+      (let [unquoted (second form)]
+        (assert (= (count form) 2) "unquote expects exactly one argument")
         unquoted)
 
-      (= (first ast) (symbol "splice-unquote"))
+      (= (symbol "splice-unquote") (first form))
       (mal.core/throw "splice-unquote used outside of list context")
 
       :else
-      (loop [elements ast
-             segments []
-             last-segment []]
-        (if (empty? elements)
-          (cons (symbol "concat")
-                (if (empty? last-segment)
-                  segments
-                  (conj segments last-segment)))
-          (let [element (first elements)]
-            (if (and (list? element)
-                     (= (symbol "splice-unquote") (first element)))
-              (let [unquoted (second element)]
-                (assert (= (count element) 2)
-                  "splice-unquote expects only one argument")
-                (recur (rest elements)
-                       (if (empty? last-segment)
-                         (conj segments unquoted)
-                         (conj segments last-segment unquoted))
-                       []))
-              (recur (rest elements)
-                     segments
-                     (conj last-segment (expand-quasiquote element))))))))
-    (cond
-      (or (symbol? ast) (map? ast))
-      (list (symbol "quote") ast)
+      (expand-quasiquote-list form))
 
-      (vector? ast)
-      (list (symbol "vec") (expand-quasiquote (seq ast)))
+    (vector? form)
+    (list (symbol "vec") (expand-quasiquote-list form))
 
-      :else
-      ast)))
+    (map? form)
+    (list (symbol "quote") form)
+
+    (symbol? form)
+    (list (symbol "quote") form)
+
+    :else
+    form))
 
 (defn macroexpand [ctx locals form]
   (if (list? form)

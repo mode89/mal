@@ -95,6 +95,9 @@
 (defn concat$ [& xs]
   (apply list (concat [(sym$ "concat")] xs)))
 
+(defn list$ [& xs]
+  (cons (sym$ "list") xs))
+
 (defn try$
   ([expr]
     (list (sym$ "try*") expr))
