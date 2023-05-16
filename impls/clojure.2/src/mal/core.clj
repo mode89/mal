@@ -126,7 +126,7 @@
                (join " "
                  (map (fn [x]
                         (pr-object x print-readably))
-                      (flatten (into [] object))))
+                      (apply concat (seq object))))
                \} )
     (fn? object)
       (clj/str "#function[" (clj/str object) "]")

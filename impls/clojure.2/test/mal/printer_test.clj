@@ -18,6 +18,7 @@
   (is (= (core/pr-object "a\\b" true) "\"a\\\\b\""))
   (is (= (core/pr-object {} true) "{}"))
   (is (= (core/pr-object {1 2 3 4} true) "{1 2 3 4}"))
+  (is (= "{1 [2 3]}" (core/pr-object {1 [2 3]} true)))
   (is (= (core/pr-object (core/keyword "some.namespace/some-keyword") true)
          ":some.namespace/some-keyword"))
   (is (= (core/pr-object {(core/keyword "a") 1 (core/keyword "b") 2} true)
