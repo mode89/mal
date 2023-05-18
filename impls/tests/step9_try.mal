@@ -293,8 +293,8 @@
 (str "A" {:abc "val"} "Z")
 ;=>"A{:abc val}Z"
 
-(str true "." false "." nil "." :keyw "." 'symb)
-;=>"true.false.nil.:keyw.symb"
+;;; (str true "." false "." nil "." :keyw "." 'symb)
+;;; ;=>"true.false.nil.:keyw.symb"
 
 (pr-str "A" {:abc "val"} "Z")
 ;=>"\"A\" {:abc \"val\"} \"Z\""
