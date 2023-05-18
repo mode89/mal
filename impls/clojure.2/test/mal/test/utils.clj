@@ -1,6 +1,5 @@
 (ns mal.test.utils
-  (:require [mal.core :as core]
-            [mal.types :as types]))
+  (:require [mal.core :as core]))
 
 (defmacro catch-ex-info [& body]
   `(try
@@ -30,7 +29,7 @@
    :current-ns (-> ctx core/deref :current-ns :name :name)})
 
 (defn mock-ns [name bindings]
-  (types/->Namespace (core/symbol name) (core/atom bindings)))
+  (core/->Namespace (core/symbol name) (core/atom bindings)))
 
 (defn mock-eval-context [& {:keys [ns-registry current-ns]}]
   (let [registry (into {}
@@ -38,7 +37,7 @@
                           [(core/symbol name) (mock-ns name bindings)])
                         ns-registry))]
     (core/atom
-      (types/->EvalContext
+      (core/->EvalContext
         (core/atom registry)
         (when (some? current-ns)
           (get registry (core/symbol current-ns)))))))
@@ -109,3 +108,13 @@
 
 (defn throw$ [obj]
   (list (sym$ "throw*") obj))
+
+(defmacro thrown-with-msg* [message & body]
+  `(re-find ~message
+     (try ~@body
+       (catch Error ex#
+         (.getMessage ex#))
+       (catch Exception ex#
+         (if (mal.core/object-exception? ex#)
+           (mal.core/object-exception-unwrap ex#)
+           (.getMessage ex#))))))

@@ -1,11 +1,13 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
             [mal.core :as core]
+            [mal.reader :as reader]
             [mal.test.utils :refer [is-list? is-vector? mock-eval-context
-                                    sample-eval-context sym$ kw$ quote$ qq$
-                                    unq$ spunq$ def$ let$ if$ fn$ defmacro$
-                                    do$ concat$ list$ try$ throw$]])
-  (:import [mal.types Function Keyword Namespace]))
+                                    mock-ns sample-eval-context sym$ kw$
+                                    quote$ qq$ unq$ spunq$ def$ let$ if$
+                                    fn$ defmacro$ do$ concat$ list$ try$
+                                    throw$ thrown-with-msg*]])
+  (:import [mal.core Function Keyword Namespace Symbol]))
 
 (def common-bindings
   {(core/symbol "+") +
@@ -35,14 +37,12 @@
                        [{(sym$ "foo") (fn [x y] (+ x y))
                          (sym$ "bar") 42}]
               (list (sym$ "foo") 7 (sym$ "bar")))))
-  (is (re-find #"Can't call this"
-        (try (core/eval (mock-eval-context) [{(sym$ "foo") 42}]
-               (list (sym$ "foo")))
-          (catch Exception ex (.getMessage ex)))))
-  (is (re-find #"Can't call this"
-        (try (core/eval (mock-eval-context) [{(sym$ "foo") identity}]
-                (list "foo" 42))
-          (catch Exception ex (.getMessage ex))))))
+  (is (thrown-with-msg* #"Can't call this"
+        (core/eval (mock-eval-context) [{(sym$ "foo") 42}]
+          (list (sym$ "foo")))))
+  (is (thrown-with-msg* #"Can't call this"
+        (core/eval (mock-eval-context) [{(sym$ "foo") identity}]
+          (list "foo" 42)))))
 
 (deftest resolve-symbol
   (is (= 42 (core/resolve-symbol (mock-eval-context) [{(sym$ "a") 42}]
@@ -343,10 +343,6 @@
     (is (= 0 (core/eval ctx [common-bindings]
                (list (sym$ "foo") 10000))))))
 
-(deftest core-read-string
-  (is (= (core/read-string "(foo [1 \"2\"] {abc :def})")
-         (list (sym$ "foo") [1 "2"] {(sym$ "abc") (kw$ "def")}))))
-
 (deftest core-atom
   (is (core/atom? (core/atom 42)))
   (is (= (core/deref (core/atom 42)) 42))
@@ -576,7 +572,7 @@
               :ns-registry {"user" common-bindings}
               :current-ns "user")]
     (core/eval ctx []
-      (core/read-string
+      (reader/read-string
         "(defmacro! unless
            (fn* (pred a b)
              `(if ~pred ~b ~a)))"))
@@ -674,7 +670,7 @@
     (is (= 20 (core/apply f 2 [3 4])))
     (is (= 26 (core/apply f 3 4 [5]))))
   (let [f (core/eval (mock-eval-context) [common-bindings]
-            (core/read-string
+            (reader/read-string
               "(fn* [a b c]
                  (+ a (* b 2) (* c 3)))"))]
     (is (= 14 (core/apply f (list 1 2 3))))
@@ -686,21 +682,16 @@
   (is (re-find #"apply expects at least 2 arguments"
         (try (core/apply identity)
           (catch Error e (.getMessage e)))))
-  (is (re-find #"last argument to apply must be a sequence"
-        (try (core/apply identity 1 2 3)
-          (catch Error e (.getMessage e)))))
-  (is (re-find #"Can't call this"
-        (try (core/apply "identity" [1 2 3])
-          (catch Exception ex (.getMessage ex)))))
-  (is (re-find #"Can't call this"
-        (try (core/apply 42 [4 5])
-          (catch Exception ex (.getMessage ex))))))
+  (is (thrown-with-msg* #"last argument to apply must be a sequence"
+        (core/apply identity 1 2 3)))
+  (is (thrown-with-msg* #"Can't call this" (core/apply "identity" [1 2 3])))
+  (is (thrown-with-msg* #"Can't call this" (core/apply 42 [4 5]))))
 
 (deftest core-map
   (is-list? (core/map inc (list 1 2 3)) (list 2 3 4))
   (is-list? (core/map inc [1 2 3]) (list 2 3 4))
   (let [f (core/eval (mock-eval-context) [common-bindings]
-            (core/read-string "(fn* [x] (+ x 1))"))]
+            (reader/read-string "(fn* [x] (+ x 1))"))]
     (is-list? (core/map f (list 1 2 3)) (list 2 3 4))
     (is-list? (core/map f [1 2 3]) (list 2 3 4))))
 
@@ -781,3 +772,74 @@
                      (quote$ (sym$ "foo"))
                      (quote$ (sym$ "bar"))))
           (catch Error e (.getMessage e))))))
+
+(deftest functions
+  (is (core/fn? (core/->Function false [] nil nil nil)))
+  (is (core/fn? (fn [] nil))))
+
+(deftest symbols
+  (let [sym (core/symbol "foo")]
+    (is (instance? Symbol sym))
+    (is (= "foo" (:name sym)))
+    (is (= nil (:namespace sym))))
+  (let [sym (core/symbol "foo/bar")]
+    (is (instance? Symbol sym))
+    (is (= "bar" (:name sym)))
+    (is (= "foo" (:namespace sym))))
+  (let [sym (core/symbol "/")]
+    (is (instance? Symbol sym))
+    (is (= "/" (:name sym)))
+    (is (= nil (:namespace sym))))
+  (is (core/simple-symbol? (core/symbol "foo")))
+  (is (not (core/simple-symbol? (core/symbol "foo/bar"))))
+  (is (core/symbol? (Symbol. nil "foo")))
+  (is (thrown-with-msg? Error #"Symbol name must be a string\. Got: 42"
+        (core/symbol 42))))
+
+(deftest core-pr-str*
+  (is (= (core/pr-str* 1 true) "1"))
+  (is (= (core/pr-str* "1" true) "\"1\""))
+  (is (= "a" (core/pr-str* (core/symbol "a") false)))
+  (is (= "a" (core/pr-str* (core/symbol "a") true)))
+  (is (= "[1 \"2\" x]" (core/pr-str* [1 "2" (core/symbol "x")] true)))
+  (is (= "(1 [\"2\" some-symbol])"
+         (core/pr-str* (list 1 ["2" (core/symbol "some-symbol")]) true)))
+  (is (= "foo/bar" (core/pr-str* (core/symbol "foo/bar") true)))
+  (is (= (core/pr-str* "abc\"def" true) "\"abc\\\"def\""))
+  (is (= (core/pr-str* "a\nb" true) "\"a\\nb\""))
+  (is (= (core/pr-str* "a\tb" true) "\"a\\tb\""))
+  (is (= (core/pr-str* "a\\b" true) "\"a\\\\b\""))
+  (is (= (core/pr-str* {} true) "{}"))
+  (is (= (core/pr-str* {1 2 3 4} true) "{1 2 3 4}"))
+  (is (= "{1 [2 3]}" (core/pr-str* {1 [2 3]} true)))
+  (is (= (core/pr-str* (core/keyword "some.namespace/some-keyword") true)
+         ":some.namespace/some-keyword"))
+  (is (= (core/pr-str* {(core/keyword "a") 1 (core/keyword "b") 2} true)
+         "{:a 1 :b 2}"))
+  (is (= (core/pr-str* nil true) "nil"))
+  (is (= (core/pr-str* true true) "true"))
+  (is (= (core/pr-str* false true) "false"))
+  (is (= (core/pr-str* "abc\"def" false) "abc\"def"))
+  (is (= (core/pr-str* "a\nb" false) "a\nb"))
+  (is (= (core/pr-str* "a\tb" false) "a\tb"))
+  (is (= (core/pr-str* "a\\b" false) "a\\b"))
+  (is (= (core/pr-str* (list "a\"b" "c\nd" "e\\f" "g\th") false)
+         "(a\"b c\nd e\\f g\th)"))
+  (is (= (core/pr-str* ["a\"b" "c\nd" "e\\f" "g\th"] false)
+         "[a\"b c\nd e\\f g\th]"))
+  (is (= (core/pr-str* {"a\"b" "c\nd" "e\\f" "g\th"} false)
+         "{a\"b c\nd e\\f g\th}"))
+  (is (re-matches #"#function\[.*\]" (core/pr-str* + false)))
+  (is (re-matches #"#macro\[.*\]"
+        (core/pr-str*
+          (core/eval
+            (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")
+            []
+            (reader/read-string "(defmacro! foo (fn* [x] x))"))
+          false)))
+  (is (= "(atom 42)" (core/pr-str* (core/atom 42) false)))
+  (is (= "#namespace[some.random.namespace.name]"
+        (core/pr-str* (mock-ns "some.random.namespace.name" {}) false)))
+  (is (re-matches #"#object\[.*\]" (core/pr-str* (Object.) false))))

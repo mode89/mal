@@ -1,14 +1,13 @@
 (ns mal.s6
   (:require [mal.core :as core]
             [mal.reader :as reader]
-            [mal.types :as types]
-            ))
+            [mal.repl-namespace :refer [repl-namespace]]))
 
 (def CONTEXT
   (core/atom
-    (types/->EvalContext
-      (core/atom {(:name core/core-ns) core/core-ns})
-      core/core-ns)))
+    (core/->EvalContext
+      (core/atom {(:name repl-namespace) repl-namespace})
+      repl-namespace)))
 
 (defn READ [input]
   (reader/read-string input))
@@ -25,16 +24,16 @@
       EVAL
       PRINT))
 
-(core/ns-bind core/core-ns (core/symbol "eval") EVAL)
+(core/ns-bind repl-namespace (core/symbol "eval") EVAL)
 
-(core/ns-bind core/core-ns (core/symbol "load-file")
+(core/ns-bind repl-namespace (core/symbol "load-file")
   (fn [filename]
     (core/eval CONTEXT []
-      (core/read-string
+      (reader/read-string
         (core/str "(do " (core/slurp filename) "\n" "nil" ")")))))
 
 (defn -main [& args]
-  (core/ns-bind core/core-ns (core/symbol "*ARGV*") (apply list (rest args)))
+  (core/ns-bind repl-namespace (core/symbol "*ARGV*") (apply list (rest args)))
   (when-some [filename (first args)]
     (rep (core/str "(load-file \"" filename "\")")))
   (loop []

@@ -1,15 +1,16 @@
 (ns mal.s8
   (:require [mal.core :as core]
-            [mal.types :as types]))
+            [mal.reader :as reader]
+            [mal.repl-namespace :refer [repl-namespace]]))
 
 (def CONTEXT
   (core/atom
-    (types/->EvalContext
-      (core/atom {(:name core/core-ns) core/core-ns})
-      core/core-ns)))
+    (core/->EvalContext
+      (core/atom {(:name repl-namespace) repl-namespace})
+      repl-namespace)))
 
 (defn READ [input]
-  (core/read-string input))
+  (reader/read-string input))
 
 (defn EVAL [form]
   (core/eval CONTEXT [] form))
@@ -41,7 +42,7 @@
               (cons 'cond (rest (rest xs)))))))")
 
 (defn -main [& args]
-  (core/ns-bind core/core-ns (core/symbol "*ARGV*") (apply list (rest args)))
+  (core/ns-bind repl-namespace (core/symbol "*ARGV*") (apply list (rest args)))
   (when-some [filename (first args)]
     (rep (core/str "(load-file \"" filename "\")")))
   (loop []

@@ -1,13 +1,13 @@
 (ns mal.s3
   (:require [mal.core :as core]
             [mal.reader :as reader]
-            [mal.types :as types]))
+            [mal.repl-namespace :refer [repl-namespace]]))
 
 (def CONTEXT
   (core/atom
-    (types/->EvalContext
-      (core/atom {(:name core/core-ns) core/core-ns})
-      core/core-ns)))
+    (core/->EvalContext
+      (core/atom {(:name repl-namespace) repl-namespace})
+      repl-namespace)))
 
 (def repl-env
   {(core/symbol "+") (fn [a b] (+ a b))
@@ -22,7 +22,7 @@
   (core/eval CONTEXT [repl-env] form))
 
 (defn PRINT [input]
-  (core/pr-object input true))
+  (core/pr-str* input true))
 
 (defn rep [input]
   (-> input

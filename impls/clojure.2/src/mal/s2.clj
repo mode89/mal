@@ -47,7 +47,7 @@
     (eval-ast ast env)))
 
 (defn PRINT [input]
-  (core/pr-object input true))
+  (core/pr-str* input true))
 
 (defn rep [input]
   (-> input

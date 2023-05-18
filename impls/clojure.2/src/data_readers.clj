@@ -1,1 +1,1 @@
-{mal/debug mal.core/debug-macro}
+{mal/debug mal.clojure.impl/debug-macro}
