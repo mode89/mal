@@ -13,6 +13,7 @@
 (def ^:macro defrecord #'impl/defrecord)
 (def ^:macro fn #'clojure.core/fn)
 (def ^:macro declare #'clojure.core/declare)
+(def ^:macro when #'clojure.core/when)
 (def ^:macro when-some #'clojure.core/when-some)
 (def ^:macro if-some #'clojure.core/if-some)
 (def ^:macro case #'clojure.core/case)
@@ -119,13 +120,22 @@
            (not (:macro? x)))
       (impl/native-fn? x)))
 
-(defn symbol [name]
-  (assert (string? name) (str "Symbol name must be a string. Got: " name))
-  (let [separator (impl/index-of name \/)]
-    (if (and (some? separator)
-             (> (count name) 1))
-      (new Symbol (subs name 0 separator) (subs name (inc separator)))
-      (new Symbol nil name))))
+(defn symbol
+  ([name]
+    (assert (string? name) (str "Symbol name must be a string. Got: " name))
+    (let [separator (impl/index-of name \/)]
+      (if (and (some? separator)
+               (> (count name) 1))
+        (new Symbol (subs name 0 separator) (subs name (inc separator)))
+        (new Symbol nil name))))
+  ([ns name]
+    (assert (string? name) (str "Symbol name must be a string. Got: " name))
+    (new Symbol
+      (when (some? ns)
+        (assert (string? ns)
+          (str "Symbol namespace name must be a string. Got: " ns))
+        ns)
+      name)))
 
 (defn symbol? [x]
   (instance? Symbol x))

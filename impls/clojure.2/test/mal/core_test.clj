@@ -786,15 +786,29 @@
     (is (instance? Symbol sym))
     (is (= "bar" (:name sym)))
     (is (= "foo" (:namespace sym))))
+  (let [sym (core/symbol "baz" "qux")]
+    (is (instance? Symbol sym))
+    (is (= "baz" (:namespace sym)))
+    (is (= "qux" (:name sym))))
+  (let [sym (core/symbol nil "fred")]
+    (is (instance? Symbol sym))
+    (is (= nil (:namespace sym)))
+    (is (= "fred" (:name sym))))
   (let [sym (core/symbol "/")]
     (is (instance? Symbol sym))
     (is (= "/" (:name sym)))
     (is (= nil (:namespace sym))))
   (is (core/simple-symbol? (core/symbol "foo")))
+  (is (core/simple-symbol? (core/symbol nil "fred")))
   (is (not (core/simple-symbol? (core/symbol "foo/bar"))))
+  (is (not (core/simple-symbol? (core/symbol "baz" "qux"))))
   (is (core/symbol? (Symbol. nil "foo")))
-  (is (thrown-with-msg? Error #"Symbol name must be a string\. Got: 42"
-        (core/symbol 42))))
+  (is (thrown-with-msg* #"Symbol name must be a string\. Got: 42"
+        (core/symbol 42)))
+  (is (thrown-with-msg* #"Symbol name must be a string"
+        (core/symbol nil 42)))
+  (is (thrown-with-msg* #"Symbol namespace name must be a string"
+        (core/symbol 42 "foo"))))
 
 (deftest core-pr-str*
   (is (= (core/pr-str* 1 true) "1"))
