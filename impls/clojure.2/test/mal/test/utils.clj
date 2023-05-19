@@ -92,10 +92,10 @@
   (list (sym$ "cons") x xs))
 
 (defn concat$ [& xs]
-  (apply list (concat [(sym$ "concat")] xs)))
+  (apply list (concat [(sym$ "mal.core/concat")] xs)))
 
 (defn list$ [& xs]
-  (cons (sym$ "list") xs))
+  (cons (sym$ "mal.core/list") xs))
 
 (defn try$
   ([expr]

@@ -4,7 +4,22 @@
             [mal.python.compiler :as c]
             [mal.reader :as r]
             [mal.test.utils :refer [def$ defmacro$ do$ if$ kw$ fn$ let$ qq$
-                                    quote$ spunq$ sym$ unq$]]))
+                                    quote$ spunq$ sym$ thrown-with-msg*
+                                    unq$]]))
+
+(defn munge*
+  ([name]
+    (c/munge-symbol (core/symbol name)))
+  ([ns name]
+    (c/munge-symbol (core/symbol ns name))))
+
+(defn mock-ns [ns-name bindings]
+  {:name ns-name
+   :bindings (into {}
+               (map (fn [bname]
+                      [(core/symbol bname)
+                       {:python-name (munge* ns-name bname)}])
+                    bindings))})
 
 (defn mock-compile-context [& {:keys [ns-registry
                                       current-ns
@@ -12,19 +27,21 @@
                                       counter]}]
   (assert (or (nil? locals) (set? locals)))
   (let [registry (into {}
-                   (map (fn [[name bindings]]
+                   (map (fn [[ns-name bindings]]
                           (assert (set? bindings))
-                          [(core/symbol name)
-                           {:name name
-                            :bindings (into #{}
-                                        (map core/symbol bindings))}])
+                          [(core/symbol ns-name)
+                           (mock-ns ns-name bindings)])
                         ns-registry))]
     (c/map->CompileContext
       {:ns-registry registry
        :current-ns (when (some? current-ns)
                      (assert (contains? ns-registry current-ns))
                      (core/symbol current-ns))
-       :locals (into #{} (map core/symbol locals))
+       :locals (into {}
+                 (map (fn [name]
+                        [(core/symbol name)
+                         {:python-name (munge* name)}])
+                      locals))
        :counter (if (some? counter) counter 0)})))
 
 (deftest emit-assign
@@ -291,51 +308,46 @@
   (is (= "___map" (c/munge-name "map")))
   (is (= "___set" (c/munge-name "set")))
   (is (= "___str" (c/munge-name "str")))
-  (is (re-find #"name '___map' is reserved"
-        (try (c/munge-name "___map")
-          (catch Exception e (core/object-exception-unwrap e)))))
-  (is (re-find #"name '___str' is reserved"
-        (try (c/munge-name "___str")
-          (catch Exception e (core/object-exception-unwrap e))))))
+  (is (thrown-with-msg* #"name '___map' is reserved"
+        (c/munge-name "___map")))
+  (is (thrown-with-msg* #"name '___str' is reserved"
+        (c/munge-name "___str"))))
 
 (deftest munge-symbol
   (is (= "foo" (c/munge-symbol (sym$ "foo"))))
-  (is (= "foo.bar.baz" (c/munge-symbol (sym$ "foo.bar/baz"))))
-  (is (= "foo_bar._STAR_baz_STAR_._PLUS_qux_fred_BANG_"
+  (is (= "foo_DOT_bar_SLASH_baz" (c/munge-symbol (sym$ "foo.bar/baz"))))
+  (is (= "foo_bar_DOT__STAR_baz_STAR__SLASH__PLUS_qux_fred_BANG_"
          (c/munge-symbol (sym$ "foo-bar.*baz*/+qux-fred!"))))
-  (is (re-find #"must be a symbol"
-        (try (c/munge-symbol "foo")
-          (catch Error e (.getMessage e))))))
+  (is (thrown-with-msg* #"must be a symbol" (c/munge-symbol "foo"))))
 
 (deftest resolve-symbol-name
   (is (= "foo" (c/resolve-symbol-name
                  (mock-compile-context :locals #{"foo"})
                  (sym$ "foo"))))
-  (is (= "bar" (c/resolve-symbol-name
-                 (mock-compile-context
-                   :ns-registry {"foo" #{"bar"}}
-                   :current-ns "foo")
-                 (sym$ "bar"))))
-  (is (= "baz.qux" (c/resolve-symbol-name
-                     (mock-compile-context
-                       :ns-registry {"foo" #{"bar"}
-                                     "baz" #{"qux"}}
-                       :current-ns "foo")
-                     (sym$ "baz/qux"))))
+  (is (= (munge* "foo" "bar") (c/resolve-symbol-name
+                                (mock-compile-context
+                                  :ns-registry {"foo" #{"bar"}}
+                                  :current-ns "foo")
+                                (sym$ "bar"))))
+  (is (= (munge* "baz" "qux") (c/resolve-symbol-name
+                                (mock-compile-context
+                                  :ns-registry {"foo" #{"bar"}
+                                                "baz" #{"qux"}}
+                                  :current-ns "foo")
+                                (sym$ "baz/qux"))))
   (is (re-find #"must be a symbol"
         (try (c/resolve-symbol-name
                (mock-compile-context :locals #{"foo"})
                "foo")
           (catch Error e (.getMessage e)))))
-  (is (re-find #"locals must be a set"
-        (try (c/resolve-symbol-name
-               (c/map->CompileContext
-                 {:ns-registry nil
-                  :current-ns nil
-                  :locals ["foo"]
-                  :counter 0})
-               (sym$ "foo"))
-          (catch Error e (.getMessage e)))))
+  (is (thrown-with-msg* #"locals must be a map"
+        (c/resolve-symbol-name
+          (c/map->CompileContext
+            {:ns-registry nil
+             :current-ns nil
+             :locals ["foo"]
+             :counter 0})
+          (sym$ "foo"))))
   (is (re-find #"'bar' not found"
         (try (c/resolve-symbol-name
                (mock-compile-context
@@ -366,34 +378,32 @@
                  :locals #{"baz" "qux"})
                (sym$ "fred"))
           (catch Exception e (core/object-exception-unwrap e)))))
-  (is (re-find #"namespace bindings must be a set"
-        (try (c/resolve-symbol-name
-               (c/map->CompileContext
-                 {:ns-registry {(sym$ "foo") [(sym$ "bar")]}
-                  :current-ns (sym$ "foo")
-                  :locals #{}
-                  :counter 0})
-               (sym$ "bar"))
-          (catch Error e (.getMessage e)))))
-  (is (re-find #"namespace bindings must be a set"
-        (try (c/resolve-symbol-name
-               (c/map->CompileContext
-                 {:ns-registry {(sym$ "foo") #{}
-                                (sym$ "bar") [(sym$ "baz")]}
-                  :current-ns (sym$ "foo")
-                  :locals #{}
-                  :counter 0})
-               (sym$ "bar/baz"))
-          (catch Error e (.getMessage e)))))
-  (is (re-find #"current namespace not found"
-        (try (c/resolve-symbol-name
-               (c/map->CompileContext
-                 {:ns-registry {(sym$ "foo") #{(sym$ "bar")}}
-                  :current-ns (sym$ "baz")
-                  :locals #{}
-                  :counter 0})
-               (sym$ "bar"))
-          (catch Error e (.getMessage e))))))
+  (is (thrown-with-msg* #"namespace bindings must be a map"
+        (c/resolve-symbol-name
+          (c/map->CompileContext
+            {:ns-registry {(sym$ "foo") [(sym$ "bar")]}
+             :current-ns (sym$ "foo")
+             :locals {}
+             :counter 0})
+          (sym$ "bar"))))
+  (is (thrown-with-msg* #"namespace bindings must be a map"
+        (c/resolve-symbol-name
+          (c/map->CompileContext
+            {:ns-registry {(sym$ "foo") {}
+                           (sym$ "bar") [(sym$ "baz")]}
+             :current-ns (sym$ "foo")
+             :locals {}
+             :counter 0})
+          (sym$ "bar/baz"))))
+  (is (thrown-with-msg* #"current namespace not found"
+        (c/resolve-symbol-name
+          (c/map->CompileContext
+            {:ns-registry {(sym$ "foo")
+                           {(sym$ "bar") {:python-name "bar"}}}
+             :current-ns (sym$ "baz")
+             :locals {}
+             :counter 0})
+          (sym$ "bar")))))
 
 (deftest transform
   (let [ctx (mock-compile-context)]
@@ -405,7 +415,7 @@
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{"list"}}
               :current-ns "foo")]
-    (is (= [[:call "___list"] nil ctx] (c/transform ctx ()))))
+    (is (= [[:call (munge* "foo" "list")] nil ctx] (c/transform ctx ()))))
   (let [ctx (mock-compile-context :locals #{"foo"})]
     (is (= [[:value "foo"] nil ctx] (c/transform ctx (sym$ "foo"))))))
 
@@ -413,27 +423,33 @@
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
-    (is (= [[:value "bar"]
-            [[:assign (c/globals "bar") [:value "42"]]]
+    (is (= [[:value (munge* "foo" "bar")]
+            [[:assign (c/globals (munge* "foo" "bar")) [:value "42"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo")]
            (c/transform ctx (def$ "bar" 42))))
-    (is (= [[:value "qux"]
+    (is (= [[:value (munge* "foo" "qux")]
             [[:value "1"]
-             [:assign (c/globals "qux") [:value "2"]]]
-            (update-in ctx [:ns-registry (sym$ "foo") :bindings]
-              conj (sym$ "qux"))]
+             [:assign (c/globals (munge* "foo" "qux")) [:value "2"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"qux"}}
+              :current-ns "foo")]
            (c/transform ctx
              (def$ "qux"
                (do$ 1 2))))))
-  (is (re-find #"def! expects a symbol as the first argument"
-        (try (c/transform
-               (mock-compile-context
-                 :ns-registry {"foo" #{}}
-                 :current-ns "foo")
-               (list (sym$ "def!") "bar" 42))
-          (catch Error e (.getMessage e)))))
+  (is (thrown-with-msg* #"def! expects a simple symbol as the first argument"
+        (c/transform
+          (mock-compile-context
+            :ns-registry {"foo" #{}}
+            :current-ns "foo")
+          (list (sym$ "def!") "bar" 42))))
+  (is (thrown-with-msg* #"def! expects a simple symbol as the first argument"
+        (c/transform
+          (mock-compile-context
+            :ns-registry {"foo" #{}}
+            :current-ns "foo")
+          (list (sym$ "def!") (sym$ "foo/bar") 42))))
   (is (re-find #"def! expects 2 arguments"
         (try (c/transform
                (mock-compile-context
@@ -460,16 +476,16 @@
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
     (is (= [[:value "None"] nil ctx] (c/transform ctx (do$))))
-    (is (= [[:value "bar"]
-            [[:assign (c/globals "bar") [:value "42"]]]
+    (is (= [[:value (munge* "foo" "bar")]
+            [[:assign (c/globals (munge* "foo" "bar")) [:value "42"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo")]
            (c/transform ctx (do$ (def$ "bar" 42)))))
-    (is (= [[:value "baz"]
-            [[:assign (c/globals "bar") [:value "42"]]
-             [:value "bar"]
-             [:assign (c/globals "baz") [:value "43"]]]
+    (is (= [[:value (munge* "foo" "baz")]
+            [[:assign (c/globals (munge* "foo" "bar")) [:value "42"]]
+             [:value (munge* "foo" "bar")]
+             [:assign (c/globals (munge* "foo" "baz")) [:value "43"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar" "baz"}}
               :current-ns "foo")]
@@ -489,7 +505,7 @@
     (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
-                 [:assign "a" [:value "42"]]
+                 [:assign [:value "a"] [:value "42"]]
                  [:return [:value "a"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx
@@ -498,10 +514,10 @@
     (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
-                 [:assign (c/globals "b") [:value "42"]]
-                 [:assign "a" [:value "b"]]
-                 [:assign (c/globals "d") [:value "43"]]
-                 [:assign "c" [:value "d"]]
+                 [:assign (c/globals (munge* "foo" "b")) [:value "42"]]
+                 [:assign [:value "a"] [:value (munge* "foo" "b")]]
+                 [:assign (c/globals (munge* "foo" "d")) [:value "43"]]
+                 [:assign [:value "c"] [:value (munge* "foo" "d")]]
                  [:value "a"]
                  [:return [:value "c"]]]]]
             (mock-compile-context
@@ -517,8 +533,8 @@
     (is (= [[:call (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
-                 [:assign "a" [:value "42"]]
-                 [:assign "b" [:value "a"]]
+                 [:assign [:value "a"] [:value "42"]]
+                 [:assign [:value "b"] [:value "a"]]
                  [:return [:value "b"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx
@@ -581,15 +597,15 @@
             (assoc ctx :counter 1)]
            (c/transform ctx (if$ false 43 44))))
     (is (= [[:value (c/temp-name 0)]
-            [[:value "a"]
-             [:if [:value "b"]
+            [[:value (munge* "foo" "a")]
+             [:if [:value (munge* "foo" "b")]
                [:block
-                 [:value "c"]
-                 [:assign (c/temp-name 0) [:value "d"]]]
+                 [:value (munge* "foo" "c")]
+                 [:assign (c/temp-name 0) [:value (munge* "foo" "d")]]]
                nil
                [:block
-                 [:value "e"]
-                 [:assign (c/temp-name 0) [:value "f"]]]]]
+                 [:value (munge* "foo" "e")]
+                 [:assign (c/temp-name 0) [:value (munge* "foo" "f")]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx
              (if$ (do$ (sym$ "a") (sym$ "b"))
@@ -624,8 +640,8 @@
     (is (= [[:value (c/temp-name 0)]
             [[:def (c/temp-name 0) []
                [:block
-                 [:value "bar"]
-                 [:value "baz"]
+                 [:value (munge* "foo" "bar")]
+                 [:value (munge* "foo" "baz")]
                  [:return [:value "qux"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx
@@ -703,13 +719,20 @@
 
 (deftest transform-quote
   (let [ctx (mock-compile-context
-              :ns-registry {"foo" #{"hash-map"
-                                    "hash-set"
-                                    "keyword"
-                                    "list"
-                                    "symbol"
-                                    "vector"}}
-              :current-ns "foo")]
+              :ns-registry {"mal.core" #{"hash-map"
+                                         "hash-set"
+                                         "keyword"
+                                         "list"
+                                         "symbol"
+                                         "vector"}
+                            "foo" #{}}
+              :current-ns "foo")
+        keyword* (munge* "mal.core/keyword")
+        list* (munge* "mal.core/list")
+        symbol* (munge* "mal.core/symbol")
+        vector* (munge* "mal.core/vector")
+        hash-map* (munge* "mal.core/hash-map")
+        hash-set* (munge* "mal.core/hash-set")]
     (is (= [[:value "None"] nil ctx] (c/transform ctx (quote$ nil))))
     (is (= [[:value "True"] nil ctx] (c/transform ctx (quote$ true))))
     (is (= [[:value "False"] nil ctx] (c/transform ctx (quote$ false))))
@@ -717,46 +740,46 @@
     (is (= [[:value "3.14"] nil ctx] (c/transform ctx (quote$ 3.14))))
     (is (= [[:value "\"Hello, \\\"World\\\"!\""] nil ctx]
            (c/transform ctx (quote$ "Hello, \"World\"!"))))
-    (is (= [[:call [:value "keyword"] [:value "\"foo\""]] nil ctx]
+    (is (= [[:call [:value keyword*] [:value "\"foo\""]] nil ctx]
            (c/transform ctx (quote$ (kw$ "foo")))))
-    (is (= [[:call [:value "symbol"] [:value "\"foo/bar\""]] nil ctx]
+    (is (= [[:call [:value symbol*] [:value "\"foo/bar\""]] nil ctx]
            (c/transform ctx (quote$ (sym$ "foo/bar")))))
-    (is (= [[:call [:value "symbol"] [:value "\"baz\""]] nil ctx]
+    (is (= [[:call [:value symbol*] [:value "\"baz\""]] nil ctx]
            (c/transform ctx (quote$ (sym$ "baz")))))
-    (is (= [[:call [:value "___list"]] nil ctx]
+    (is (= [[:call [:value list*]] nil ctx]
            (c/transform ctx (quote$ (list)))))
-    (is (= [[:call [:value "___list"]
+    (is (= [[:call [:value list*]
               [:value "None"]
               [:value "43"]
               [:value "\"hello\""]
-              [:call [:value "symbol"] [:value "\"qux\""]]]
+              [:call [:value symbol*] [:value "\"qux\""]]]
             nil ctx]
            (c/transform ctx (quote$ (list nil 43 "hello" (sym$ "qux"))))))
-    (is (= [[:call [:value "vector"]] nil ctx]
+    (is (= [[:call [:value vector*]] nil ctx]
            (c/transform ctx (quote$ []))))
-    (is (= [[:call [:value "vector"]
+    (is (= [[:call [:value vector*]
               [:value "None"]
               [:value "43"]
               [:value "\"hello\""]
-              [:call [:value "symbol"] [:value "\"qux\""]]]
+              [:call [:value symbol*] [:value "\"qux\""]]]
             nil ctx]
            (c/transform ctx (quote$ [nil 43 "hello" (sym$ "qux")]))))
-    (is (= [[:call [:value "hash_map"]] nil ctx]
+    (is (= [[:call [:value hash-map*]] nil ctx]
            (c/transform ctx (quote$ {}))))
-    (is (= [[:call [:value "hash_map"]
+    (is (= [[:call [:value hash-map*]
               [:value "\"hello\""]
-              [:call [:value "symbol"] [:value "\"qux\""]]
+              [:call [:value symbol*] [:value "\"qux\""]]
               [:value "None"]
               [:value "43"]]
             nil ctx]
            (c/transform ctx (quote$ {nil 43 "hello" (sym$ "qux")}))))
-    (is (= [[:call [:value "hash_set"]] nil ctx]
+    (is (= [[:call [:value hash-set*]] nil ctx]
            (c/transform ctx (quote$ #{}))))
-    (is (= [[:call [:value "hash_set"]
+    (is (= [[:call [:value hash-set*]
               [:value "\"hello\""]
               [:value "43"]
               [:value "None"]
-              [:call [:value "symbol"] [:value "\"qux\""]]]
+              [:call [:value symbol*] [:value "\"qux\""]]]
             nil ctx]
            (c/transform ctx (quote$ #{nil 43 "hello" (sym$ "qux")}))))
     (is (re-find #"quote expects one argument"
@@ -771,139 +794,150 @@
               :ns-registry {"foo" #{"bar" "baz"}}
               :current-ns "foo"
               :locals #{"qux"})]
-    (is (= [[:call [:value "foo.bar"]] [] ctx]
+    (is (= [[:call [:value (munge* "foo/bar")]] [] ctx]
            (c/transform ctx (list (sym$ "foo/bar")))))
-    (is (= [[:call [:value "baz"]
+    (is (= [[:call [:value (munge* "foo/baz")]
               [:value "1"] [:value "2"] [:value "3"]]
             []
             ctx]
            (c/transform ctx (list (sym$ "baz") 1 2 3))))
     (is (= [[:call [:value "qux"]
-              [:value "\"hello\""] [:value "a"] [:value "bar"]]
-            [[:assign (c/globals "a") [:value "43"]]]
-            (update-in ctx [:ns-registry (sym$ "foo") :bindings]
-              conj (sym$ "a"))]
+              [:value "\"hello\""]
+              [:value (munge* "foo/a")]
+              [:value (munge* "foo/bar")]]
+            [[:assign (c/globals (munge* "foo/a")) [:value "43"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar" "baz" "a"}}
+              :current-ns "foo"
+              :locals #{"qux"})]
            (c/transform ctx
              (list (sym$ "qux") "hello" (def$ "a" 43) (sym$ "bar")))))
-    (is (= [[:call (c/temp-name 0) [:value "b"]]
-            [[:assign (c/globals "a") [:value "1"]]
+    (is (= [[:call (c/temp-name 0) [:value (munge* "foo/b")]]
+            [[:assign (c/globals (munge* "foo/a")) [:value "1"]]
              [:assign (c/temp-name 0)
-               [:call [:value "bar"] [:value "a"]]]
-             [:assign (c/globals "b") [:value "2"]]]
-            (-> ctx
-                (update-in [:ns-registry (sym$ "foo") :bindings]
-                  conj (sym$ "a") (sym$ "b"))
-                (assoc :counter 1))]
+               [:call [:value (munge* "foo/bar")]
+                 [:value (munge* "foo/a")]]]
+             [:assign (c/globals (munge* "foo/b")) [:value "2"]]]
+            (mock-compile-context
+              :ns-registry {"foo" #{"bar" "baz" "a" "b"}}
+              :current-ns "foo"
+              :locals #{"qux"}
+              :counter 1)]
            (c/transform ctx
              (list (list (sym$ "bar") (def$ "a" 1)) (def$ "b" 2)))))))
 
 (deftest transform-quasiquote
   (let [ctx (mock-compile-context
-              :ns-registry {"foo" #{"bar"
-                                    "baz"
-                                    "concat"
-                                    "list"
-                                    "symbol"
-                                    "vec"
-                                    "vector"}}
+              :ns-registry {"mal.core" #{"concat"
+                                         "list"
+                                         "symbol"
+                                         "vec"
+                                         "vector"}
+                            "foo" #{"bar" "baz"}}
               :current-ns "foo"
-              :locals #{"qux"})]
+              :locals #{"qux"})
+        concat* (munge* "mal.core/concat")
+        list* (munge* "mal.core/list")
+        symbol* (munge* "mal.core/symbol")
+        vec* (munge* "mal.core/vec")
+        vector* (munge* "mal.core/vector")]
     (is (= [[:value "None"] nil ctx] (c/transform ctx (qq$ nil))))
-    (is (= [[:call [:value "symbol"] [:value "\"a\""]] nil ctx]
+    (is (= [[:call [:value symbol*] [:value "\"a\""]] nil ctx]
            (c/transform ctx (qq$ (sym$ "a")))))
-    (is (= [[:value "bar"] nil ctx]
+    (is (= [[:value (munge* "foo/bar")] nil ctx]
            (c/transform ctx (qq$ (unq$ (sym$ "bar"))))))
-    (is (= [[:call [:value "concat"] [:value "baz"]] [] ctx]
+    (is (= [[:call [:value concat*] [:value (munge* "foo/baz")]] [] ctx]
            (c/transform ctx (qq$ (list (spunq$ (sym$ "baz")))))))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "___list"]
+    (is (= [[:call [:value concat*]
+              [:call [:value list*]
                 [:value "42"]
-                [:call [:value "symbol"] [:value "\"x\""]]]
+                [:call [:value symbol*] [:value "\"x\""]]]
               [:value "qux"]]
             [] ctx]
            (c/transform ctx
              (qq$ (list 42 (sym$ "x") (spunq$ (sym$ "qux")))))))
-    (is (= [[:call [:value "concat"]
-              [:value "bar"]
-              [:call [:value "___list"]
-                [:call [:value "symbol"] [:value "\"fred\""]]
+    (is (= [[:call [:value concat*]
+              [:value (munge* "foo/bar")]
+              [:call [:value list*]
+                [:call [:value symbol*] [:value "\"fred\""]]
                 [:value "42"]]]
             [] ctx]
            (c/transform ctx
              (qq$ (list (spunq$ (sym$ "bar")) (sym$ "fred") 42)))))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "___list"]
+    (is (= [[:call [:value concat*]
+              [:call [:value list*]
                 [:value "1"]
-                [:call [:value "concat"]
+                [:call [:value concat*]
                   [:value "qux"]
-                  [:call [:value "___list"] [:value "2"]]]]]
+                  [:call [:value list*] [:value "2"]]]]]
             [] ctx]
            (c/transform ctx
-             (qq$ (list 1 (list (spunq$ (sym$ "qux")) 2))))
-           ))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "___list"] [:value "bar"] [:value "42"]]
-              [:value "baz"]]
+             (qq$ (list 1 (list (spunq$ (sym$ "qux")) 2))))))
+    (is (= [[:call [:value concat*]
+              [:call [:value list*]
+                [:value (munge* "foo/bar")]
+                [:value "42"]]
+              [:value (munge* "foo/baz")]]
             [] ctx]
            (c/transform ctx
-             (qq$ (list (unq$ (sym$ "bar")) 42 (spunq$ (sym$ "baz")))))
-           ))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "vector"]
+             (qq$ (list (unq$ (sym$ "bar")) 42 (spunq$ (sym$ "baz")))))))
+    (is (= [[:call [:value concat*]
+              [:call [:value vector*]
                 [:value "1"]
                 [:value "2"]
-                [:call [:value "concat"]
-                  [:call [:value "___list"]
+                [:call [:value concat*]
+                  [:call [:value list*]
                     [:value "3"]
                     [:value "4"]]]]]
             [] ctx]
            (c/transform ctx
-             (r/read-string "`(~@(vector 1 2 `(~@(list 3 4))))"))))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "___list"]
+             (r/read-string
+               "`(~@(mal.core/vector 1 2 `(~@(mal.core/list 3 4))))"))))
+    (is (= [[:call [:value concat*]
+              [:call [:value list*]
                 [:value "42"]
-                [:call [:value "concat"]
-                  [:call [:value "___list"] [:value "43"]]
-                  [:value "bar"]]]
-              [:value "baz"]]
+                [:call [:value concat*]
+                  [:call [:value list*] [:value "43"]]
+                  [:value (munge* "foo/bar")]]]
+              [:value (munge* "foo/baz")]]
             [[:value "1"]
              [:value "2"]]
             ctx]
            (c/transform ctx
              (r/read-string "`(42 (43 ~@(do 1 bar)) ~@(do 2 baz))"))))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "___list"]
-                [:call [:value "concat"]
-                  [:call [:value "___list"] [:value "bar"]]
-                  [:value "x"]]]
-              [:value "x"]]
+    (is (= [[:call [:value concat*]
+              [:call [:value list*]
+                [:call [:value concat*]
+                  [:call [:value list*] [:value (munge* "foo/bar")]]
+                  [:value (munge* "foo/x")]]]
+              [:value (munge* "foo/x")]]
             [[:value "1"]
-             [:assign (c/globals "x") [:value "2"]]
+             [:assign (c/globals (munge* "foo/x")) [:value "2"]]
              [:value "3"]]
             (update-in ctx [:ns-registry (sym$ "foo") :bindings]
-              conj (sym$ "x"))]
+              assoc (sym$ "x") {:python-name (munge* "foo/x")})]
            (c/transform ctx
              (r/read-string "`((~bar ~@(do 1 (def! x 2))) ~@(do 3 x))"))))
-    (is (= [[:call [:value "concat"]
-              [:call [:value "___list"]
+    (is (= [[:call [:value concat*]
+              [:call [:value list*]
                 [:value "1"]
                 [:value "qux"]
                 [:value "2"]]
-              [:value "bar"]
-              [:value "baz"]]
+              [:value (munge* "foo" "bar")]
+              [:value (munge* "foo" "baz")]]
             [] ctx]
            (c/transform ctx
              (qq$ (list 1 (unq$ (sym$ "qux")) 2
                         (spunq$ (sym$ "bar"))
                         (spunq$ (sym$ "baz")))))))
-    (is (= [[:call [:value "vec"]
-              [:call [:value "concat"]
-                [:call [:value "___list"]
+    (is (= [[:call [:value vec*]
+              [:call [:value concat*]
+                [:call [:value list*]
                   [:value "1"]
                   [:value "qux"]
                   [:value "2"]]
-                [:value "bar"]
-                [:value "baz"]]]
+                [:value (munge* "foo" "bar")]
+                [:value (munge* "foo" "baz")]]]
             [] ctx]
            (c/transform ctx
              (qq$ (vector 1 (unq$ (sym$ "qux")) 2
@@ -933,13 +967,15 @@
               :ns-registry {"foo" #{}}
               :current-ns "foo")
         temp0 (c/temp-name 0)]
-    (is (= [[:value "bar"]
+    (is (= [[:value (munge* "foo/bar")]
             [[:def temp0 []
                [:block
                  [:return [:value "None"]]]]
-             [:assign (c/globals "bar") [:value temp0]]
+             [:assign (c/globals (munge* "foo/bar")) [:value temp0]]
              [:call [:value "setattr"]
-               [:value "bar"] [:value "___is_mal_macro"] [:value "True"]]]
+               [:value (munge* "foo/bar")]
+               [:value "___is_mal_macro"]
+               [:value "True"]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar"}}
               :current-ns "foo"
@@ -970,7 +1006,7 @@
         temp0 (c/temp-name 0)]
     (is (= [[:value "None"] nil ctx]
            (c/transform ctx (list (sym$ "try*")))))
-    (is (= [[:value "bar"] nil ctx]
+    (is (= [[:value (munge* "foo/bar")] nil ctx]
            (c/transform ctx
              (list (sym$ "try*") (sym$ "bar")))))
     (is (= [[:value temp0]
@@ -997,15 +1033,15 @@
     (is (= [[:value temp0]
             [[:try
                [:block
-                 [:assign (c/globals "a") [:value "1"]]
-                 [:value "a"]
-                 [:assign (c/globals "b") [:value "2"]]
-                 [:assign [:value temp0] [:value "b"]]]
+                 [:assign (c/globals (munge* "foo/a")) [:value "1"]]
+                 [:value (munge* "foo/a")]
+                 [:assign (c/globals (munge* "foo/b")) [:value "2"]]
+                 [:assign [:value temp0] [:value (munge* "foo/b")]]]
                [["Exception" "exc"
                   [:block
-                    [:assign (c/globals "c") [:value "exc"]]
-                    [:value "c"]
-                    [:assign [:value temp0] [:value "bar"]]]]]]]
+                    [:assign (c/globals (munge* "foo/c")) [:value "exc"]]
+                    [:value (munge* "foo/c")]
+                    [:assign [:value temp0] [:value (munge* "foo/bar")]]]]]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar" "a" "b" "c"}}
               :current-ns "foo"
@@ -1020,11 +1056,11 @@
     (is (= [[:value temp0]
             [[:try
                [:block
-                 [:assign (c/globals "x") [:value "42"]]
-                 [:assign [:value temp0] [:value "x"]]]
+                 [:assign (c/globals (munge* "foo/x")) [:value "42"]]
+                 [:assign [:value temp0] [:value (munge* "foo/x")]]]
                [["Exception" "exc"
                   [:block
-                    [:assign [:value temp0] [:value "x"]]]]]]]
+                    [:assign [:value temp0] [:value (munge* "foo/x")]]]]]]]
             (mock-compile-context
               :ns-registry {"foo" #{"bar" "x"}}
               :current-ns "foo"
@@ -1045,11 +1081,14 @@
                     (list (sym$ "catch*") (sym$ "ex1") (sym$ "ex1"))
                     (list (sym$ "catch*") (sym$ "ex2") (sym$ "ex2"))))
             (catch Exception e (core/object-exception-unwrap e)))))
-    (is (re-find #"exception object must be a symbol"
-          (try (c/transform ctx
-                 (list (sym$ "try*") 42
-                   (list (sym$ "catch*") "ex" (sym$ "ex"))))
-            (catch Error e (.getMessage e)))))
+    (is (thrown-with-msg* #"exception object must be a simple symbol"
+          (c/transform ctx
+            (list (sym$ "try*") 42
+              (list (sym$ "catch*") "ex" (sym$ "ex"))))))
+    (is (thrown-with-msg* #"exception object must be a simple symbol"
+          (c/transform ctx
+            (list (sym$ "try*") 42
+              (list (sym$ "catch*") (sym$ "foo/ex") (sym$ "ex"))))))
     (is (re-find #"catch\* expects at most 2 arguments"
           (try (c/transform ctx
                  (list (sym$ "try*") 42

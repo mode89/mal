@@ -317,7 +317,7 @@
                                   (first element))))]
     (apply list ; form must be stored as a list
       (cons
-        (symbol "concat")
+        (symbol "mal.core/concat")
         (mapcat
           (fn [segment]
             (if (splice-unquote? (first segment))
@@ -332,7 +332,7 @@
                   (cons
                     ; when macroexpanding, this sequence will be converted
                     ; to a list, to be consumed by concat
-                    (symbol "list")
+                    (symbol "mal.core/list")
                     (map expand-quasiquote segment))))))
           (partition-by splice-unquote? form))))))
 
@@ -352,7 +352,7 @@
       (expand-quasiquote-list form))
 
     (vector? form)
-    (list (symbol "vec") (expand-quasiquote-list form))
+    (list (symbol "mal.core/vec") (expand-quasiquote-list form))
 
     (map? form)
     (list (symbol "quote") form)

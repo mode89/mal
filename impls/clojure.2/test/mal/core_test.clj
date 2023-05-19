@@ -425,10 +425,12 @@
 (deftest eval-quasiquote
   (let [eval-qq (fn [form]
                   (core/eval
-                    (mock-eval-context)
+                    (mock-eval-context
+                      :ns-registry {"mal.core" common-bindings
+                                    "foo" {}}
+                      :current-ns "foo")
                     [{(sym$ "x") 42
-                      (sym$ "l") (list 1 2 3)}
-                     common-bindings]
+                      (sym$ "l") (list 1 2 3)}]
                     (qq$ form)))]
     (is (= (eval-qq 42) 42))
     (is (= (eval-qq (sym$ "x")) (sym$ "x")))
@@ -521,7 +523,8 @@
          (core/macroexpand (mock-eval-context) [{(sym$ "x") 2}]
            (list (sym$ "x") 1))))
   (let [ctx (mock-eval-context
-              :ns-registry {"user" nil}
+              :ns-registry {"mal.core" common-bindings
+                            "user" nil}
               :current-ns "user")]
     (core/eval ctx [common-bindings]
       (defmacro$ "dup"
@@ -569,7 +572,8 @@
                  (let$ (list (sym$ "a") 123)
                    (list (sym$ "identity") (sym$ "a")))))))
   (let [ctx (mock-eval-context
-              :ns-registry {"user" common-bindings}
+              :ns-registry {"mal.core" common-bindings
+                            "user" nil}
               :current-ns "user")]
     (core/eval ctx []
       (reader/read-string

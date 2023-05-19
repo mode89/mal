@@ -278,14 +278,7 @@
 
 (defn munge-symbol [sym]
   (assert (core/symbol? sym) "must be a symbol")
-  (str
-    (when-some [ns (:namespace sym)]
-      (str
-        (join "."
-          (map munge-name
-            (split ns #"\.")))
-        "."))
-    (munge-name (:name sym))))
+  (munge-name (core/str sym)))
 
 (defn temp-name [counter]
   (assert (int? counter) "counter must be an integer")
@@ -304,51 +297,56 @@
 
 (defn resolve-symbol-name [ctx sym]
   (assert (core/symbol? sym) "must be a symbol")
-  (assert (set? (:locals ctx)) "locals must be a set")
+  (assert (map? (:locals ctx)) "locals must be a map")
   (cond
     (some? (:namespace sym))
-      (let [sym-ns-name (:namespace sym)
-            sym-ns (get (:ns-registry ctx) (core/symbol sym-ns-name))]
-        (if (some? sym-ns)
-          (let [bindings (:bindings sym-ns)
-                sym-name (:name sym)
-                simp-sym (core/symbol sym-name)]
-            (assert (set? bindings) "namespace bindings must be a set")
-            (if (contains? bindings simp-sym)
-              (munge-symbol sym)
-              (throw-not-found sym)))
-          (core/throw (str "namespace '" sym-ns-name "' not found"))))
+    (let [sym-ns-name (:namespace sym)
+          sym-ns (get (:ns-registry ctx) (core/symbol sym-ns-name))]
+      (if (some? sym-ns)
+        (let [bindings (:bindings sym-ns)
+              sym-name (:name sym)
+              simp-sym (core/symbol sym-name)]
+          (assert (map? bindings) "namespace bindings must be a map")
+          (if (contains? bindings simp-sym)
+            (-> bindings (get simp-sym) :python-name)
+            (throw-not-found sym)))
+        (core/throw (str "namespace '" sym-ns-name "' not found"))))
+
     (contains? (:locals ctx) sym)
-      (munge-symbol sym)
+    (-> ctx :locals (get sym) :python-name)
+
     (some? (:current-ns ctx))
-      (let [current-ns (get (:ns-registry ctx) (:current-ns ctx))
-            bindings (:bindings current-ns)]
-        (assert (some? current-ns) "current namespace not found")
-        (assert (set? bindings) "namespace bindings must be a set")
-        (if (contains? bindings sym)
-          (munge-symbol sym)
-          (throw-not-found sym)))
+    (let [current-ns (get (:ns-registry ctx) (:current-ns ctx))
+          bindings (:bindings current-ns)]
+      (assert (some? current-ns) "current namespace not found")
+      (assert (map? bindings) "namespace bindings must be a map")
+      (if (contains? bindings sym)
+        (-> bindings (get sym) :python-name)
+        (throw-not-found sym)))
+
     :else
-      (throw-not-found sym)))
+    (throw-not-found sym)))
 
 (declare transform)
 
 (defn transform-def [ctx args]
   (let [name (first args)
-        value-form (second args)]
-    (assert (core/symbol? name)
-            "def! expects a symbol as the first argument")
+        value-form (second args)
+        current-ns (:current-ns ctx)]
+    (assert (some? current-ns) "no current namespace")
+    (assert (core/simple-symbol? name)
+      "def! expects a simple symbol as the first argument")
     (assert (= (count args) 2) "def! expects 2 arguments")
     (let [[val-expr val-body ctx2] (transform ctx value-form)
-          current-ns (:current-ns ctx)]
-      (assert (some? current-ns) "no current namespace")
-      [[:value (munge-symbol name)]
+          munged (munge-symbol (core/symbol (:name current-ns)
+                                            (:name name)))]
+      [[:value munged]
        (concat
          val-body
-         [[:assign (globals (munge-symbol name)) val-expr]])
+         [[:assign (globals munged) val-expr]])
        (update-in ctx2
          [:ns-registry current-ns :bindings]
-         conj name)])))
+         assoc name {:python-name munged})])))
 
 (defn transform-defmacro [ctx args]
   (let [name (first args)
@@ -359,20 +357,21 @@
     (assert (and (seq? f) (= (core/symbol "fn*") (first f)))
       "defmacro! expects fn* as the second argument")
     (let [[res body ctx*] (transform ctx f)
-          name-munged (munge-symbol name)
-          current-ns (:current-ns ctx)]
-      (assert (some? current-ns) "no current namespace")
-      [[:value name-munged]
+          current-ns (:current-ns ctx)
+          _ (assert (some? current-ns) "no current namespace")
+          python-name (munge-symbol (core/symbol (:name current-ns)
+                                                 (:name name)))]
+      [[:value python-name]
        (concat
          body
-         [[:assign (globals name-munged) res]
+         [[:assign (globals python-name) res]
           [:call [:value "setattr"]
-            [:value name-munged]
+            [:value python-name]
             [:value "___is_mal_macro"]
             [:value "True"]]])
        (update-in ctx*
          [:ns-registry current-ns :bindings]
-         conj name)])))
+         assoc name {:python-name python-name})])))
 
 (defn make-let-func [ctx bindings body]
   (loop [bindings* bindings
@@ -386,16 +385,17 @@
            [[:return body-res]])
          (assoc ctx** :locals (:locals ctx))])
       (let [[name value] (first bindings*)
+            _ (assert (core/simple-symbol? name)
+                "binding name must be a simple symbol")
+            python-name (munge-symbol name)
             [value-res value-do ctx**] (transform ctx* value)]
-        (assert (core/simple-symbol? name)
-          "binding name must be a simple symbol")
         (recur
           (rest bindings*)
           (concat
             fbody
             value-do
-            [[:assign (munge-symbol name) value-res]])
-          (update ctx** :locals conj name))))))
+            [[:assign [:value python-name] value-res]])
+          (update ctx** :locals assoc name {:python-name python-name}))))))
 
 (defn transform-let [ctx args]
   (let [bindings-spec (first args)
@@ -455,25 +455,26 @@
 (defn handle-fn-params [params]
   (loop [params params
          py-params []
-         locals #{}]
+         locals {}]
     (if (empty? params)
       [py-params locals]
       (let [param (first params)]
         (assert (core/simple-symbol? param)
           "function parameter must be a simple symbol")
         (if (= (:name param) "&")
-          (let [var-params (second params)]
+          (let [variadic-param (second params)
+                _ (assert (core/simple-symbol? variadic-param)
+                    "variadic parameter must be a simple symbol")
+                python-name (munge-symbol variadic-param)]
             (assert (= (count params) 2)
               "expected only one parameter after &")
-            (assert (core/simple-symbol? var-params)
-              "variadic parameter must be a simple symbol")
-            [(conj py-params
-                   (str "*" (munge-symbol var-params)))
-             (conj locals var-params)])
-          (recur
-            (rest params)
-            (conj py-params (munge-symbol param))
-            (conj locals param)))))))
+            [(conj py-params (str "*" python-name))
+             (assoc locals variadic-param {:python-name python-name})])
+          (let [python-name (munge-symbol param)]
+            (recur
+              (rest params)
+              (conj py-params python-name)
+              (assoc locals param {:python-name python-name}))))))))
 
 (defn transform-fn [ctx args]
   (let [params (first args)
@@ -481,8 +482,7 @@
         [py-params locals] (handle-fn-params params)
         [func ctx2] (gen-temp-name ctx)
         [fbody-res fbody ctx3] (transform
-                                 (update ctx2
-                                   :locals union locals)
+                                 (update ctx2 :locals merge locals)
                                  body)]
     (assert (>= 2 (count args)) "fn* expects at most 2 arguments")
     [[:value func]
@@ -494,7 +494,8 @@
 
 (defn quote-expr [ctx x]
   (let [resolve* (fn [name]
-                   (resolve-symbol-name ctx (core/symbol name)))]
+                   (resolve-symbol-name ctx
+                     (core/symbol "mal.core" name)))]
     (cond
       (nil? x) [:value "None"]
       (boolean? x) [:value (if x "True" "False")]
@@ -564,15 +565,18 @@
                                   "try* expects at most 2 arguments"))]
     (if (some? catch-form)
       (let [ex-binding (second catch-form)
-            _ (assert (core/symbol? ex-binding)
-                "exception object must be a symbol")
+            _ (assert (core/simple-symbol? ex-binding)
+                "exception object must be a simple symbol")
+            ex-python-name (munge-symbol ex-binding)
             _ (assert (<= (count catch-form) 3)
                 "catch* expects at most 2 arguments")
             catch-expr (nth catch-form 2 nil)
             [result ctx2] (gen-temp-name ctx)
             [tres tbody ctx3] (transform ctx2 try-expr)
             [cres cbody ctx4] (transform
-                                (update ctx3 :locals conj ex-binding)
+                                (update ctx3 :locals
+                                  assoc ex-binding
+                                    {:python-name ex-python-name})
                                 catch-expr)]
         [[:value result]
          [[:try
@@ -580,7 +584,7 @@
               (concat
                 tbody
                 [[:assign [:value result] tres]]))
-            [["Exception" (munge-symbol ex-binding)
+            [["Exception" ex-python-name
                (cons :block
                  (concat
                    cbody
