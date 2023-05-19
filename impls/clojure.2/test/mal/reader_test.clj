@@ -110,3 +110,9 @@
          (list (core/symbol "with-meta") [1 2 3] {"a" 1})))
   (is (= (r/read-string "[1 nil {:a true :b [false]}]")
          [1 nil {(core/keyword "a") true (core/keyword "b") [false]}])))
+
+(deftest read-string*
+  (is (= [(list (core/symbol "a") (core/keyword "d") 3)
+          [4 (core/symbol "b") (core/keyword "e")]
+          {7 (core/keyword "f") (core/symbol "c") 10}]
+         (r/read-string* "(a :d 3)\n[4 b :e]\n{7 :f c 10}"))))

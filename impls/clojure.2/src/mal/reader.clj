@@ -146,3 +146,14 @@
                    (ex-info "Failed to parse"
                      {:message (:message result)
                       :next-token (->> result :state first (into {}))})))))
+
+(defn read-string* [string]
+  (let [tokens (l/tokenize string)
+        forms (pa/many (form) :till end-of-stream)
+        result (pa/run forms tokens)]
+    (condp instance? result
+      Value (:value result)
+      ParseError (throw
+                   (ex-info "Failed to parse"
+                     {:message (:message result)
+                      :next-token (->> result :state first (into {}))})))))
