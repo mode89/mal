@@ -98,6 +98,7 @@
 
 (declare eval)
 (declare map)
+(declare pr-str)
 (declare str)
 
 (defn nil? [x]
@@ -186,7 +187,7 @@
       (impl/native-fn? f)
         (impl/apply f args*)
       :else
-        (impl/throw (str "Can't call this: " f)))))
+        (impl/throw (str "Can't call this: " (pr-str f))))))
 
 (defn swap! [a f & args]
   (assert (atom? a))
@@ -505,7 +506,7 @@
                   (impl/native-fn? f)
                     (impl/apply f args)
                   :else
-                    (impl/throw (str "Can't call this: " f)))))))
+                    (impl/throw (str "Can't call this: " (pr-str f))))))))
       (symbol? form)
         (if (= (symbol "*ns*") form)
           (-> ctx deref :current-ns)
