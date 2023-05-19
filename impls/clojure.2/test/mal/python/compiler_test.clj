@@ -14,8 +14,7 @@
     (c/munge-symbol (core/symbol ns name))))
 
 (defn mock-ns [ns-name bindings]
-  {:name ns-name
-   :bindings (into {}
+  {:bindings (into {}
                (map (fn [bname]
                       [(core/symbol bname)
                        {:python-name (munge* ns-name bname)}])
