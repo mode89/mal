@@ -258,6 +258,13 @@
                (when (some? finally)
                  (emit finally)))))))
 
+(defn switch-ns [ctx ns]
+  (assert (core/simple-symbol? ns) "namespace name must be a simple symbol")
+  (-> ctx
+      (update :ns-registry
+        assoc ns (get-in ctx [:ns-registry ns] {:bindings {}}))
+      (assoc :current-ns ns)))
+
 (defn munge-name [name]
   (assert (string? name))
   (cond

@@ -1105,3 +1105,30 @@
                    (list (sym$ "catch*") (sym$ "ex1") (sym$ "ex1"))
                    (list (sym$ "catch*") (sym$ "ex2") (sym$ "ex2"))))
             (catch Exception e (core/object-exception-unwrap e)))))))
+
+(deftest switch-ns
+  (is (= (mock-compile-context
+           :ns-registry {"foo" #{"bar"}
+                         "baz" #{"qux"}}
+           :current-ns "baz")
+         (c/switch-ns
+           (mock-compile-context
+             :ns-registry {"foo" #{"bar"}
+                           "baz" #{"qux"}}
+             :current-ns "foo")
+           (core/symbol "baz"))))
+  (is (= (mock-compile-context
+           :ns-registry {"foo" #{"bar"}
+                         "qux" #{}}
+           :current-ns "qux")
+         (c/switch-ns
+           (mock-compile-context
+             :ns-registry {"foo" #{"bar"}}
+             :current-ns "foo")
+           (core/symbol "qux"))))
+  (is (thrown-with-msg* #"namespace name must be a simple symbol"
+        (c/switch-ns
+          (mock-compile-context
+            :ns-registry {"foo" #{"bar"}}
+            :current-ns "foo")
+          (core/symbol "foo/bar")))))
