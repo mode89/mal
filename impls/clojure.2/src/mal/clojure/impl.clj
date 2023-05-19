@@ -109,9 +109,9 @@
         prefix (if (clojure.core/some? tag)
                  (str tag)
                  nil)]
-    `(let [x# ~x
+    `(clojure.core/let [x# ~x
            prefix# ~prefix]
-       (if (some? prefix#)
+       (if (clojure.core/some? prefix#)
          (clojure.core/println prefix# x#)
          (clojure.core/println x#))
        x#)))
