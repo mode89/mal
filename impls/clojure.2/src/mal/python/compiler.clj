@@ -1,6 +1,5 @@
 (ns mal.python.compiler
-  (:require [clojure.set :refer [union]]
-            [clojure.string :refer [join split triml]]
+  (:require [clojure.string :refer [join triml]]
             [mal.core :as core]))
 
 (def SPECIAL-NAMES
