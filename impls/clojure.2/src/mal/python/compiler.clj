@@ -107,10 +107,10 @@
     (or (= :value tag)
         (= :call tag))))
 
-(defn emit-assign [name value]
-  (assert-symbol name)
-  (assert-line value)
-  [(str name " = " value)])
+(defn emit-assign [left right]
+  (assert-symbol left)
+  (assert-line right)
+  [(str left " = " right)])
 
 (defn emit-call [name args kwargs]
   (assert-symbol name)
@@ -193,12 +193,13 @@
   "Emit list of python source lines for the given python-like AST."
   [ast]
   (let [tag (first ast)]
-    (assert (keyword? tag))
+    (assert (keyword? tag) (str "Invalid tag: " tag))
     (case tag
       ; Assign an expression to a variable
-      :assign (let [[name value] (rest ast)]
-                (assert (expression? value))
-                (emit-assign name (first (emit value))))
+      :assign (let [[left right] (rest ast)]
+                (assert (expression? left))
+                (assert (expression? right))
+                (emit-assign (first (emit left)) (first (emit right))))
       :call (let [[name & args] (rest ast)
                   [pargs kwargs] (let [kwargs (last args)]
                                    (if (map? kwargs)
@@ -296,7 +297,7 @@
 
 (defn globals [name]
   (assert (string? name))
-  (str "globals()[\"" name "\"]"))
+  [:value (str "globals()[\"" name "\"]")])
 
 (defn- throw-not-found [sym]
   (core/throw (core/str "'" sym "' not found")))

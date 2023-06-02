@@ -154,13 +154,13 @@
           "  g"])))
 
 (deftest emit
-  (is (= (c/emit [:assign "a" [:value "b"]]) ["a = b"]))
+  (is (= (c/emit [:assign [:value "a"] [:value "b"]]) ["a = b"]))
   (is (= (c/emit [:call [:value "foo"]
                    [:value "a"] [:value "b"]
                    {"c" [:value "42"]}])
          ["foo(a, b, c=42)"]))
   (is (= (c/emit [:block
-                   [:assign "a" [:value "b"]]
+                   [:assign [:value "a"] [:value "b"]]
                    [:call [:value "foo"]
                      [:value "a"] [:value "b"]
                      {"c" [:value "42"]}]])
@@ -168,46 +168,46 @@
           "foo(a, b, c=42)"]))
   (is (= (c/emit [:block
                    [:block
-                     [:assign "a" [:value "b"]]
-                     [:assign "c" [:value "d"]]]
+                     [:assign [:value "a"] [:value "b"]]
+                     [:assign [:value "c"] [:value "d"]]]
                    [:block
-                     [:assign "e" [:value "f"]]
-                     [:assign "g" [:value "h"]]]])
+                     [:assign [:value "e"] [:value "f"]]
+                     [:assign [:value "g"] [:value "h"]]]])
          ["a = b"
           "c = d"
           "e = f"
           "g = h"]))
   (is (= (c/emit [:if [:value "a"]
                    [:block
-                     [:assign "b" [:value "c"]]] nil nil])
+                     [:assign [:value "b"] [:value "c"]]] nil nil])
          ["if a:" "  b = c"]))
   (is (= (c/emit [:if [:value "a"]
                    [:block
-                     [:assign "b" [:value "c"]]]
+                     [:assign [:value "b"] [:value "c"]]]
                    nil
                    [:block
-                     [:assign "d" [:value "e"]]]])
+                     [:assign [:value "d"] [:value "e"]]]])
          ["if a:"
           "  b = c"
           "else:"
           "  d = e"]))
   (is (= (c/emit [:if [:value "cond1"]
                    [:block
-                     [:assign "a" [:value "b"]]
+                     [:assign [:value "a"] [:value "b"]]
                      [:call [:value "foo"] [:value "a"] [:value "b"]]]
                    [[[:value "cond2"]
                        [:block
-                         [:assign "f" [:value "g"]]
-                         [:assign "h" [:value "i"]]]]
+                         [:assign [:value "f"] [:value "g"]]
+                         [:assign [:value "h"] [:value "i"]]]]
                     [[:value "cond3"]
                        [:block
                          [:call [:value "baz"] [:value "j"] [:value "k"]]
-                         [:assign "l" [:value "m"]]]]]
+                         [:assign [:value "l"] [:value "m"]]]]]
                    [:block
                      [:call [:value "bar"]
                        [:value "x"] [:value "y"]
                        {"z" [:value "42"]}]
-                     [:assign "p" [:value "q"]]]])
+                     [:assign [:value "p"] [:value "q"]]]])
          ["if cond1:"
           "  a = b"
           "  foo(a, b)"
@@ -222,11 +222,11 @@
           "  p = q"]))
   (is (= (c/emit [:while [:value "a"]
                    [:block
-                     [:assign "b" [:value "c"]]]])
+                     [:assign [:value "b"] [:value "c"]]]])
          ["while a:" "  b = c"]))
   (is (= (c/emit [:while [:value "a"]
                    [:block
-                     [:assign "b" [:value "c"]]
+                     [:assign [:value "b"] [:value "c"]]
                      [:if [:call [:value "foo"]
                             [:value "a"] [:value "b"]
                             {"c" [:value "42"]}]
@@ -243,40 +243,40 @@
           "    continue"]))
   (is (= (c/emit [:def "foo" ["a" "b"]
                    [:block
-                     [:assign "c" [:value "d"]]
+                     [:assign [:value "c"] [:value "d"]]
                      [:return [:value "e"]]]])
          ["def foo(a, b):"
           "  c = d"
           "  return e"]))
   (is (= (c/emit [:try
                    [:block
-                     [:assign "a" [:value "b"]]]
+                     [:assign [:value "a"] [:value "b"]]]
                    nil
                    [:block
-                     [:assign "c" [:value "d"]]]])
+                     [:assign [:value "c"] [:value "d"]]]])
          ["try:"
           "  a = b"
           "finally:"
           "  c = d"]))
   (is (= (c/emit [:try
                    [:block
-                     [:assign "a" [:value "b"]]
+                     [:assign [:value "a"] [:value "b"]]
                      [:call [:value "foo"]
                        [:value "a"] [:value "b"]
                        {"c" [:value "42"]}]]
                    [["Exception" nil
                       [:block
-                        [:assign "d" [:value "e"]]
+                        [:assign [:value "d"] [:value "e"]]
                         [:return [:value "f"]]]]
                     ["ValueError" "e"
                       [:block
-                        [:assign "g" [:value "h"]]
+                        [:assign [:value "g"] [:value "h"]]
                         [:return [:value "i"]]]]
                     ["TypeError" "e"
                       [:block
-                        [:assign "j" [:value "k"]]]]]
+                        [:assign [:value "j"] [:value "k"]]]]]
                    [:block
-                     [:assign "l" [:value "m"]]
+                     [:assign [:value "l"] [:value "m"]]
                      [:return [:value "n"]]]])
          ["try:"
           "  a = b"
