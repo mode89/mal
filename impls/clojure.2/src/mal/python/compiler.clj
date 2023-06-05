@@ -599,6 +599,33 @@
          (assoc ctx4 :locals (:locals ctx))])
       (transform ctx try-expr))))
 
+(defn transform-import [ctx specs]
+  (assert (> (count specs) 0) "import expects at least one argument")
+  (assert (some? (:current-ns ctx)) "import must be called in a namespace")
+  (loop [specs* specs
+         body []
+         ctx1 ctx]
+    (if (empty? specs*)
+      [[:value "None"] body ctx1]
+      (let [[module & names] (first specs*)
+            _ (assert (core/simple-symbol? module)
+                "module name must be a simple symbol")
+            [imports ctx2] (gen-temp-name ctx1)
+            body* (conj body
+                    [:assign [:value imports]
+                      [:call [:value "__import__"]
+                        [:value (core/str "\"" module "\"")]]])
+            ctx3 (update-in ctx2 [:ns-registry (:current-ns ctx2) :bindings]
+                   merge (into {}
+                           (map
+                             (fn [name]
+                               (assert (core/simple-symbol? name)
+                                 "imported name must be a simple symbol")
+                               [name {:python-name (str imports "."
+                                                        (:name name))}])
+                             names)))]
+        (recur (rest specs*) body* ctx3)))))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -630,6 +657,7 @@
                                          (core/expand-quasiquote form*)))
           (core/symbol "try*") (transform-try ctx args)
           (core/symbol "catch*") (core/throw "catch* used outside of try*")
+          (core/symbol "import") (transform-import ctx args)
           (transform-call ctx form))))
 
     (core/symbol? form)

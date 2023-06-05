@@ -1106,6 +1106,70 @@
                    (list (sym$ "catch*") (sym$ "ex2") (sym$ "ex2"))))
             (catch Exception e (core/object-exception-unwrap e)))))))
 
+(deftest transform-import
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{}}
+              :current-ns "foo")
+        temp0 (c/temp-name 0)
+        temp1 (c/temp-name 1)
+        temp2 (c/temp-name 2)]
+    (is (= [[:value "None"]
+            [[:assign [:value temp0]
+               [:call [:value "__import__"] [:value "\"operator\""]]]]
+            (-> ctx
+                (assoc :counter 1)
+                (update-in [:ns-registry (sym$ "foo") :bindings]
+                  assoc (sym$ "is_") {:python-name (str temp0 ".is_")}))]
+           (c/transform ctx
+             (list (sym$ "import") [(sym$ "operator") (sym$ "is_")]))))
+    (is (= [[:value "None"]
+            [[:assign [:value temp0]
+               [:call [:value "__import__"] [:value "\"funcy\""]]]
+             [:assign [:value temp1]
+               [:call [:value "__import__"]
+                 [:value "\"persistent.typing\""]]]
+             [:assign [:value temp2]
+               [:call [:value "__import__"] [:value "\"unittest.mock\""]]]]
+            (-> ctx
+                (assoc :counter 3)
+                (update-in [:ns-registry (sym$ "foo") :bindings] merge
+                  {(sym$ "compose") {:python-name (str temp0 ".compose")}
+                   (sym$ "partial") {:python-name (str temp0 ".partial")}
+                   (sym$ "re_find") {:python-name (str temp0 ".re_find")}
+                   (sym$ "PMap") {:python-name (str temp1 ".PMap")}
+                   (sym$ "PMapType") {:python-name (str temp1 ".PMapType")}
+                   (sym$ "call") {:python-name (str temp2 ".call")}
+                   (sym$ "patch") {:python-name (str temp2 ".patch")}}))]
+           (c/transform ctx
+             (list (sym$ "import")
+               [(sym$ "funcy")
+                  (sym$ "compose")
+                  (sym$ "partial")
+                  (sym$ "re_find")]
+               [(sym$ "persistent.typing")
+                  (sym$ "PMap")
+                  (sym$ "PMapType")]
+               [(sym$ "unittest.mock")
+                  (sym$ "call")
+                  (sym$ "patch")]))))
+    (is (thrown-with-msg* #"module name must be a simple symbol"
+          (c/transform ctx
+            (list (sym$ "import") ["foo" (sym$ "bar")]))))
+    (is (thrown-with-msg* #"module name must be a simple symbol"
+          (c/transform ctx
+            (list (sym$ "import") [(sym$ "foo/bar") (sym$ "baz")]))))
+    (is (thrown-with-msg* #"imported name must be a simple symbol"
+          (c/transform ctx
+            (list (sym$ "import") [(sym$ "foo") "bar"]))))
+    (is (thrown-with-msg* #"imported name must be a simple symbol"
+          (c/transform ctx
+            (list (sym$ "import") [(sym$ "foo") (sym$ "bar/baz")])))))
+  (is (thrown-with-msg* #"import expects at least one argument"
+        (c/transform (mock-compile-context) (list (sym$ "import")))))
+  (is (thrown-with-msg* #"import must be called in a namespace"
+        (c/transform (mock-compile-context :current-ns nil)
+          (list (sym$ "import") [(sym$ "foo") (sym$ "bar")])))))
+
 (deftest switch-ns
   (is (= (mock-compile-context
            :ns-registry {"foo" #{"bar"}
