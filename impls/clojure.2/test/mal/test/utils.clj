@@ -43,72 +43,64 @@
         (when (some? current-ns)
           (get registry (core/symbol current-ns)))))))
 
-(defn sym$ [name]
-  (assert (string? name))
-  (core/symbol name))
-
-(defn kw$ [name]
-  (assert (string? name))
-  (core/keyword name))
-
 (defn quote$ [form]
-  (list (sym$ "quote") form))
+  (list 'quote form))
 
 (defn qq$ [form]
-  (list (sym$ "quasiquote") form))
+  (list 'quasiquote form))
 
 (defn unq$ [form]
-  (list (sym$ "unquote") form))
+  (list 'unquote form))
 
 (defn spunq$ [form]
-  (list (sym$ "splice-unquote") form))
+  (list 'splice-unquote form))
 
 (defn def$ [name value]
   (assert (string? name))
-  (list (sym$ "def!") (sym$ name) value))
+  (list 'def! (core/symbol name) value))
 
 (defn let$ [bindings body]
-  (list (sym$ "let*") bindings body))
+  (list 'let* bindings body))
 
 (defn if$
   ([pred then]
-    (list (sym$ "if") pred then))
+    (list 'if pred then))
   ([pred then else]
-    (list (sym$ "if") pred then else)))
+    (list 'if pred then else)))
 
 (defn fn$
   ([params]
-    (list (sym$ "fn*") params))
+    (list 'fn* params))
   ([params body]
-    (list (sym$ "fn*") params body)))
+    (list 'fn* params body)))
 
 (defn defmacro$ [name value]
   (assert (string? name))
-  (list (sym$ "defmacro!") (sym$ name) value))
+  (list 'defmacro! (core/symbol name) value))
 
 (defn do$ [& forms]
-  (apply list (concat [(sym$ "do")] forms)))
+  (apply list (concat ['do] forms)))
 
 (defn cons$ [x xs]
-  (list (sym$ "cons") x xs))
+  (list 'cons x xs))
 
 (defn concat$ [& xs]
-  (apply list (concat [(sym$ "mal.core/concat")] xs)))
+  (apply list (concat ['mal.core/concat] xs)))
 
 (defn list$ [& xs]
-  (cons (sym$ "mal.core/list") xs))
+  (cons 'mal.core/list xs))
 
 (defn try$
   ([expr]
-    (list (sym$ "try*") expr))
+    (list 'try* expr))
   ([expr ex catch-expr]
     (assert (string? ex))
-    (list (sym$ "try*") expr
-      (list (sym$ "catch*") (sym$ ex)
+    (list 'try* expr
+      (list 'catch* (core/symbol ex)
         catch-expr))))
 
 (defn throw$ [obj]
-  (list (sym$ "throw*") obj))
+  (list 'throw* obj))
 
 (defmacro thrown-with-msg* [message & body]
   `(re-find ~message

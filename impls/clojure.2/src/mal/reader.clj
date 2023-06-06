@@ -85,42 +85,42 @@
   (pa/let-bind [_ (token \')]
     (pa/map
       (fn [f]
-        (list (core/symbol "quote") f))
+        (list 'quote f))
       (form))))
 
 (def quasiquote-form
   (pa/let-bind [_ (token \`)]
     (pa/map
       (fn [f]
-        (list (core/symbol "quasiquote") f))
+        (list 'quasiquote f))
       (form))))
 
 (def unquote-form
   (pa/let-bind [_ (token \~)]
     (pa/map
       (fn [f]
-        (list (core/symbol "unquote") f))
+        (list 'unquote f))
       (form))))
 
 (def splice-unquote-form
   (pa/let-bind [_ (token "~@")]
     (pa/map
       (fn [f]
-        (list (core/symbol "splice-unquote") f))
+        (list 'splice-unquote f))
       (form))))
 
 (def deref-form
   (pa/let-bind [_ (token \@)]
     (pa/map
       (fn [f]
-        (list (core/symbol "deref") f))
+        (list 'deref f))
       (form))))
 
 (def with-meta-form
   (pa/let-bind [_ (token \^)
                 m (form)
                 f (form)]
-    (pa/return (list (core/symbol "with-meta") f m))))
+    (pa/return (list 'with-meta f m))))
 
 (defn form []
   (pa/label "expected a valid form"

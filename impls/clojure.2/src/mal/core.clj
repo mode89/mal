@@ -286,11 +286,10 @@
 (defn expand-quasiquote-list [form]
   (let [splice-unquote? (fn [element]
                           (and (list? element)
-                               (= (symbol "splice-unquote")
-                                  (first element))))]
+                               (= 'splice-unquote (first element))))]
     (apply list ; form must be stored as a list
       (cons
-        (symbol "mal.core/concat")
+        'mal.core/concat
         (mapcat
           (fn [segment]
             (if (splice-unquote? (first segment))
@@ -305,7 +304,7 @@
                   (cons
                     ; when macroexpanding, this sequence will be converted
                     ; to a list, to be consumed by concat
-                    (symbol "mal.core/list")
+                    'mal.core/list
                     (map expand-quasiquote segment))))))
           (partition-by splice-unquote? form))))))
 
@@ -313,25 +312,25 @@
   (cond
     (list? form)
     (cond
-      (= (symbol "unquote") (first form))
+      (= 'unquote (first form))
       (let [unquoted (second form)]
         (assert (= (count form) 2) "unquote expects exactly one argument")
         unquoted)
 
-      (= (symbol "splice-unquote") (first form))
+      (= 'splice-unquote (first form))
       (impl/throw "splice-unquote used outside of list context")
 
       :else
       (expand-quasiquote-list form))
 
     (vector? form)
-    (list (symbol "mal.core/vec") (expand-quasiquote-list form))
+    (list 'mal.core/vec (expand-quasiquote-list form))
 
     (map? form)
-    (list (symbol "quote") form)
+    (list 'quote form)
 
     (symbol? form)
-    (list (symbol "quote") form)
+    (list 'quote form)
 
     :else
     form))
@@ -361,109 +360,121 @@
           (let [head (first form)
                 args (rest form)]
             (condp = head
-              (symbol "def!")
-                (let [name (first args)
-                      value-ast (second args)]
-                  (assert (= (count args) 2) "def! expects 2 arguments")
-                  (let [value (eval ctx locals value-ast)
-                        current-ns (-> ctx deref :current-ns)]
-                    (assert (some? current-ns) "no current namespace")
-                    (ns-bind current-ns name value)
-                    value))
-              (symbol "defmacro!")
-                (let [name (first args)
-                      f (eval ctx locals (second args))]
-                  (assert (= (count args) 2) "defmacro! expects 2 arguments")
-                  (assert (symbol? name) "name of macro must be a symbol")
-                  (assert (fn? f)
-                          "last argument to defmacro! must be a function")
-                  (let [macro (assoc f :macro? true)
-                        current-ns (-> ctx deref :current-ns)]
-                    (assert (some? current-ns) "no current namespace")
-                    (swap! (:bindings current-ns) assoc name macro)
-                    macro))
-              (symbol "let*")
-                (let [bindings (first args)
-                      body (second args)]
-                  (assert (even? (count bindings))
-                          "let* expects even number of forms in bindings")
-                  (recur
-                    ctx
-                    (reduce
-                      (fn [locals' [name value]]
-                        (assert (symbol? name)
-                                "binding name must be a symbol")
-                        (cons {name (eval ctx locals' value)} locals'))
-                      locals
-                      (partition 2 bindings))
-                    body))
-              (symbol "do")
-                (let [butlast-forms (butlast args)
-                      last-form (last args)]
-                  (loop [forms butlast-forms]
-                    (when-some [form (first forms)]
-                      (eval ctx locals form)
-                      (recur (rest forms))))
-                  (recur ctx locals last-form))
-              (symbol "if")
-                (let [nargs (count args)]
-                  (assert (>= nargs 2) "if-form expects at least 2 arguments")
-                  (assert (<= nargs 3) "if-form expects at most 3 arguments")
-                  (if (eval ctx locals (first args))
-                    (recur ctx locals (second args))
-                    (if (= nargs 3)
-                      (recur ctx locals (nth args 2))
-                      nil)))
-              (symbol "fn*")
-                (make-fn*
-                  (deref ctx)
-                  locals
-                  false
-                  (first args)
-                  (second args))
-              (symbol "quote")
-                (do (assert (= (count args) 1) "quote expects 1 argument")
-                    (first args))
-              (symbol "quasiquote")
-                (do (assert (= (count args) 1)
-                      "quasiquote expects 1 argument")
-                    (recur ctx locals (expand-quasiquote (first args))))
-              (symbol "quasiquoteexpand")
-                (do (assert (= (count args) 1))
-                    (expand-quasiquote (first args)))
-              (symbol "macroexpand")
-                (do (assert (= (count args) 1))
-                    (macroexpand ctx locals (first args)))
-              (symbol "try*")
-                (let [try-expr (first args)]
-                  (if-some [catch-form (second args)]
-                    (do (assert (<= (count args) 2)
-                          "try* expects at most 2 arguments")
-                        (assert (= (first catch-form) (symbol "catch*"))
-                          "try* expects catch* form as second argument")
-                        (assert (= (count catch-form) 3)
-                          "catch* expects 3 arguments")
-                        (try
-                          (eval ctx locals try-expr)
-                          (catch Throwable ex0
-                            (let [ex-binding (second catch-form)
-                                  _ (assert (symbol? ex-binding)
-                                      "exception object must be a symbol")
-                                  catch-body (nth catch-form 2)
-                                  ex (if (object-exception? ex0)
-                                       (object-exception-unwrap ex0)
-                                       ex0)]
-                              (eval ctx
-                                    (cons {ex-binding ex} locals)
-                                    catch-body)))))
-                    (do (assert (<= (count args) 1))
-                        (recur ctx locals try-expr))))
-              (symbol "in-ns")
-                (let [ns-name (eval ctx locals (first args))]
-                  (assert (= (count args) 1) "in-ns expects 1 argument")
-                  (let [ns (ns-find-or-create ctx ns-name)]
-                    (swap! ctx assoc :current-ns ns)
-                    ns))
+              'def!
+              (let [name (first args)
+                    value-ast (second args)]
+                (assert (= (count args) 2) "def! expects 2 arguments")
+                (let [value (eval ctx locals value-ast)
+                      current-ns (-> ctx deref :current-ns)]
+                  (assert (some? current-ns) "no current namespace")
+                  (ns-bind current-ns name value)
+                  value))
+
+              'defmacro!
+              (let [name (first args)
+                    f (eval ctx locals (second args))]
+                (assert (= (count args) 2) "defmacro! expects 2 arguments")
+                (assert (symbol? name) "name of macro must be a symbol")
+                (assert (fn? f)
+                        "last argument to defmacro! must be a function")
+                (let [macro (assoc f :macro? true)
+                      current-ns (-> ctx deref :current-ns)]
+                  (assert (some? current-ns) "no current namespace")
+                  (swap! (:bindings current-ns) assoc name macro)
+                  macro))
+
+              'let*
+              (let [bindings (first args)
+                    body (second args)]
+                (assert (even? (count bindings))
+                        "let* expects even number of forms in bindings")
+                (recur
+                  ctx
+                  (reduce
+                    (fn [locals' [name value]]
+                      (assert (symbol? name)
+                              "binding name must be a symbol")
+                      (cons {name (eval ctx locals' value)} locals'))
+                    locals
+                    (partition 2 bindings))
+                  body))
+
+              'do
+              (let [butlast-forms (butlast args)
+                    last-form (last args)]
+                (loop [forms butlast-forms]
+                  (when-some [form (first forms)]
+                    (eval ctx locals form)
+                    (recur (rest forms))))
+                (recur ctx locals last-form))
+
+              'if
+              (let [nargs (count args)]
+                (assert (>= nargs 2) "if-form expects at least 2 arguments")
+                (assert (<= nargs 3) "if-form expects at most 3 arguments")
+                (if (eval ctx locals (first args))
+                  (recur ctx locals (second args))
+                  (if (= nargs 3)
+                    (recur ctx locals (nth args 2))
+                    nil)))
+
+              'fn*
+              (make-fn*
+                (deref ctx)
+                locals
+                false
+                (first args)
+                (second args))
+
+              'quote
+              (do (assert (= (count args) 1) "quote expects 1 argument")
+                  (first args))
+
+              'quasiquote
+              (do (assert (= (count args) 1)
+                    "quasiquote expects 1 argument")
+                  (recur ctx locals (expand-quasiquote (first args))))
+
+              'quasiquoteexpand
+              (do (assert (= (count args) 1))
+                  (expand-quasiquote (first args)))
+
+              'macroexpand
+              (do (assert (= (count args) 1))
+                  (macroexpand ctx locals (first args)))
+
+              'try*
+              (let [try-expr (first args)]
+                (if-some [catch-form (second args)]
+                  (do (assert (<= (count args) 2)
+                        "try* expects at most 2 arguments")
+                      (assert (= (first catch-form) (symbol "catch*"))
+                        "try* expects catch* form as second argument")
+                      (assert (= (count catch-form) 3)
+                        "catch* expects 3 arguments")
+                      (try
+                        (eval ctx locals try-expr)
+                        (catch Throwable ex0
+                          (let [ex-binding (second catch-form)
+                                _ (assert (symbol? ex-binding)
+                                    "exception object must be a symbol")
+                                catch-body (nth catch-form 2)
+                                ex (if (object-exception? ex0)
+                                     (object-exception-unwrap ex0)
+                                     ex0)]
+                            (eval ctx
+                                  (cons {ex-binding ex} locals)
+                                  catch-body)))))
+                  (do (assert (<= (count args) 1))
+                      (recur ctx locals try-expr))))
+
+              'in-ns
+              (let [ns-name (eval ctx locals (first args))]
+                (assert (= (count args) 1) "in-ns expects 1 argument")
+                (let [ns (ns-find-or-create ctx ns-name)]
+                  (swap! ctx assoc :current-ns ns)
+                  ns))
+
               (let [f (eval ctx locals head)
                     args (map (fn [x] (eval ctx locals x)) args)]
                 (cond
@@ -481,7 +492,7 @@
                   :else
                     (impl/throw (str "Can't call this: " (pr-str f))))))))
       (symbol? form)
-        (if (= (symbol "*ns*") form)
+        (if (= '*ns* form)
           (-> ctx deref :current-ns)
           (resolve-symbol ctx locals form))
       (vector? form)

@@ -361,7 +361,7 @@
     (assert (= (count args) 2) "defmacro! expects exactly 2 arguments")
     (assert (core/symbol? name)
       "defmacro! expects a symbol as the first argument")
-    (assert (and (seq? f) (= (core/symbol "fn*") (first f)))
+    (assert (and (seq? f) (= 'fn* (first f)))
       "defmacro! expects fn* as the second argument")
     (let [[res body ctx*] (transform ctx f)
           current-ns (:current-ns ctx)
@@ -468,7 +468,7 @@
       (let [param (first params)]
         (assert (core/simple-symbol? param)
           "function parameter must be a simple symbol")
-        (if (= (core/name param) "&")
+        (if (= param '&)
           (let [variadic-param (second params)
                 _ (assert (core/simple-symbol? variadic-param)
                     "variadic parameter must be a simple symbol")
@@ -557,7 +557,7 @@
 (defn transform-try [ctx args]
   (let [catch-form? (fn [form]
                       (and (list? form)
-                           (= (core/symbol "catch*") (first form))))
+                           (= 'catch* (first form))))
         [try-expr catch-form] (case (count args)
                                 0 [nil nil]
                                 1 (let [arg (first args)]
@@ -635,29 +635,29 @@
   (cond
     (list? form)
     (if (empty? form)
-      [[:call (resolve-symbol-name ctx (core/symbol "list"))] nil ctx]
+      [[:call (resolve-symbol-name ctx 'list)] nil ctx]
       (let [head (first form)
             args (rest form)]
         (condp = head
-          (core/symbol "def!") (transform-def ctx args)
-          (core/symbol "defmacro!") (transform-defmacro ctx args)
-          (core/symbol "let*") (transform-let ctx args)
-          (core/symbol "do") (transform-do ctx args)
-          (core/symbol "if") (transform-if ctx args)
-          (core/symbol "fn*") (transform-fn ctx args)
-          (core/symbol "quote") (let [value (first args)]
-                                  (assert (= 1 (count args))
-                                    "quote expects one argument")
-                                  [(quote-expr ctx value) nil ctx])
-          (core/symbol "quasiquote") (let [form* (first args)]
-                                       (assert (= 1 (count args))
-                                         (str "quasiquote expects exactly "
-                                              "one argument"))
-                                       (transform ctx
-                                         (core/expand-quasiquote form*)))
-          (core/symbol "try*") (transform-try ctx args)
-          (core/symbol "catch*") (core/throw "catch* used outside of try*")
-          (core/symbol "import") (transform-import ctx args)
+          'def! (transform-def ctx args)
+          'defmacro! (transform-defmacro ctx args)
+          'let* (transform-let ctx args)
+          'do (transform-do ctx args)
+          'if (transform-if ctx args)
+          'fn* (transform-fn ctx args)
+          'quote (let [value (first args)]
+                   (assert (= 1 (count args))
+                     "quote expects one argument")
+                   [(quote-expr ctx value) nil ctx])
+          'quasiquote (let [form* (first args)]
+                        (assert (= 1 (count args))
+                          (str "quasiquote expects exactly "
+                               "one argument"))
+                        (transform ctx
+                          (core/expand-quasiquote form*)))
+          'try* (transform-try ctx args)
+          'catch* (core/throw "catch* used outside of try*")
+          'import (transform-import ctx args)
           (transform-call ctx form))))
 
     (core/symbol? form)
