@@ -31,8 +31,6 @@
 ; <<< clojure specific
 
 (defrecord Function [macro? params body context make-locals])
-(defrecord Keyword [name])
-(defrecord Symbol [namespace name])
 (defrecord Namespace [name bindings])
 (defrecord EvalContext [ns-registry current-ns])
 
@@ -41,6 +39,13 @@
 (def type impl/type)
 (def throw impl/throw)
 (def meta impl/meta)
+(def symbol impl/symbol)
+(def symbol? impl/symbol?)
+(def simple-symbol? impl/simple-symbol?)
+(def keyword impl/keyword)
+(def keyword? impl/keyword?)
+(def name impl/name)
+(def namespace impl/namespace)
 (def string? impl/string?)
 (def subs impl/subs)
 (def inc impl/inc)
@@ -120,38 +125,6 @@
   (or (and (instance? Function x)
            (not (:macro? x)))
       (impl/native-fn? x)))
-
-(defn symbol
-  ([name]
-    (assert (string? name) (str "Symbol name must be a string. Got: " name))
-    (let [separator (impl/index-of name \/)]
-      (if (and (some? separator)
-               (> (count name) 1))
-        (new Symbol (subs name 0 separator) (subs name (inc separator)))
-        (new Symbol nil name))))
-  ([ns name]
-    (assert (string? name) (str "Symbol name must be a string. Got: " name))
-    (new Symbol
-      (when (some? ns)
-        (assert (string? ns)
-          (str "Symbol namespace name must be a string. Got: " ns))
-        ns)
-      name)))
-
-(defn symbol? [x]
-  (instance? Symbol x))
-
-(defn simple-symbol? [x]
-  (and (symbol? x)
-       (nil? (:namespace x))))
-
-(defn keyword [name]
-  (if (impl/instance? Keyword name)
-    name
-    (new Keyword name)))
-
-(defn keyword? [x]
-  (instance? Keyword x))
 
 (defn macro? [x]
   (and (instance? Function x)
@@ -237,12 +210,12 @@
 (defn resolve-symbol [ctx locals sym]
   (assert (symbol? sym) "must be a symbol")
   (assert (sequential? locals) "locals must be a sequential collection")
-  (if-some [sym-ns-name (:namespace sym)]
+  (if-some [sym-ns-name (namespace sym)]
     (if-some [sym-ns (-> ctx deref
                          :ns-registry deref
                          (get (symbol sym-ns-name)))]
       (let [bindings (-> sym-ns :bindings deref)
-            simp-sym (symbol (:name sym))]
+            simp-sym (symbol (name sym))]
         (if (contains? bindings simp-sym)
           (get bindings simp-sym)
           (throw-not-found sym)))
@@ -271,7 +244,7 @@
       template
       (let [param (first params)]
         (assert (symbol? param) "function parameter must be a symbol")
-        (if (= (:name param) "&")
+        (if (= param '&)
           (let [var-params (second params)]
             (assert (symbol? var-params)
                     "variadic parameters must be a symbol")
@@ -538,11 +511,14 @@
         object)
     (symbol? object)
       (impl/str
-        (when-some [ns (:namespace object)]
+        (when-some [ns (namespace object)]
           (str ns "/"))
-        (:name object))
+        (name object))
     (keyword? object)
-      (impl/str \: (:name object))
+      (impl/str \:
+                (when-some [ns (namespace object)]
+                  (str ns "/"))
+                (name object))
     (list? object)
       (impl/str \(
            (impl/join " "
@@ -571,7 +547,7 @@
     (atom? object)
       (impl/str "(atom " (deref object) ")")
     (instance? Namespace object)
-      (impl/str "#namespace[" (-> object :name :name) "]")
+      (impl/str "#namespace[" (-> object :name name) "]")
     :else
       (impl/str "#object["
                 (impl/str (type object))

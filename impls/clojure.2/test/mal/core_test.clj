@@ -3,11 +3,11 @@
             [mal.core :as core]
             [mal.reader :as reader]
             [mal.test.utils :refer [is-list? is-vector? mock-eval-context
-                                    mock-ns sample-eval-context sym$ kw$
+                                    mock-ns sample-eval-context sym$
                                     quote$ qq$ unq$ spunq$ def$ let$ if$
                                     fn$ defmacro$ do$ concat$ list$ try$
                                     throw$ thrown-with-msg*]])
-  (:import [mal.core Function Keyword Namespace Symbol]))
+  (:import [mal.core Function Namespace]))
 
 (def common-bindings
   {(core/symbol "+") +
@@ -551,7 +551,7 @@
         (def$ "a" 1)
         (def$ "b" 2)))
     (is (= ["a" "unless"]
-           (->> ns-bindings core/deref keys (map :name) sort)))
+           (->> ns-bindings core/deref keys (map core/name) sort)))
     (is (= 1 (-> ns-bindings core/deref (get (sym$ "a"))))))
   (let [ctx (mock-eval-context
               :ns-registry {"user" nil}
@@ -708,8 +708,7 @@
   (is-list? (core/vals {"a" 1}) (list 1)))
 
 (deftest core-keyword
-  (is (instance? Keyword (core/keyword "a")))
-  (is (= (:name (core/keyword "abc")) "abc"))
+  (is (= (core/name (core/keyword "abc")) "abc"))
   (is (= (core/keyword (core/keyword "xyz")) (core/keyword "xyz"))))
 
 (deftest namespaces
@@ -783,35 +782,35 @@
 
 (deftest symbols
   (let [sym (core/symbol "foo")]
-    (is (instance? Symbol sym))
-    (is (= "foo" (:name sym)))
-    (is (= nil (:namespace sym))))
+    (is (core/symbol? sym))
+    (is (= "foo" (core/name sym)))
+    (is (= nil (core/namespace sym))))
   (let [sym (core/symbol "foo/bar")]
-    (is (instance? Symbol sym))
-    (is (= "bar" (:name sym)))
-    (is (= "foo" (:namespace sym))))
+    (is (core/symbol? sym))
+    (is (= "bar" (core/name sym)))
+    (is (= "foo" (core/namespace sym))))
   (let [sym (core/symbol "baz" "qux")]
-    (is (instance? Symbol sym))
-    (is (= "baz" (:namespace sym)))
-    (is (= "qux" (:name sym))))
+    (is (core/symbol? sym))
+    (is (= "baz" (core/namespace sym)))
+    (is (= "qux" (core/name sym))))
   (let [sym (core/symbol nil "fred")]
-    (is (instance? Symbol sym))
-    (is (= nil (:namespace sym)))
-    (is (= "fred" (:name sym))))
+    (is (core/symbol? sym))
+    (is (= nil (core/namespace sym)))
+    (is (= "fred" (core/name sym))))
   (let [sym (core/symbol "/")]
-    (is (instance? Symbol sym))
-    (is (= "/" (:name sym)))
-    (is (= nil (:namespace sym))))
+    (is (core/symbol? sym))
+    (is (= "/" (core/name sym)))
+    (is (= nil (core/namespace sym))))
   (is (core/simple-symbol? (core/symbol "foo")))
   (is (core/simple-symbol? (core/symbol nil "fred")))
   (is (not (core/simple-symbol? (core/symbol "foo/bar"))))
   (is (not (core/simple-symbol? (core/symbol "baz" "qux"))))
-  (is (core/symbol? (Symbol. nil "foo")))
-  (is (thrown-with-msg* #"Symbol name must be a string\. Got: 42"
+  (is (core/symbol? (core/symbol nil "foo")))
+  (is (thrown? Exception
         (core/symbol 42)))
-  (is (thrown-with-msg* #"Symbol name must be a string"
+  (is (thrown? Exception
         (core/symbol nil 42)))
-  (is (thrown-with-msg* #"Symbol namespace name must be a string"
+  (is (thrown? Exception
         (core/symbol 42 "foo"))))
 
 (deftest core-pr-str*
@@ -830,8 +829,8 @@
   (is (= (core/pr-str* {} true) "{}"))
   (is (= (core/pr-str* {1 2 3 4} true) "{1 2 3 4}"))
   (is (= "{1 [2 3]}" (core/pr-str* {1 [2 3]} true)))
-  (is (= (core/pr-str* (core/keyword "some.namespace/some-keyword") true)
-         ":some.namespace/some-keyword"))
+  (is (= ":some.namespace/some-keyword"
+         (core/pr-str* (core/keyword "some.namespace/some-keyword") true)))
   (is (= (core/pr-str* {(core/keyword "a") 1 (core/keyword "b") 2} true)
          "{:a 1 :b 2}"))
   (is (= (core/pr-str* nil true) "nil"))

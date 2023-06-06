@@ -306,12 +306,12 @@
   (assert (core/symbol? sym) "must be a symbol")
   (assert (map? (:locals ctx)) "locals must be a map")
   (cond
-    (some? (:namespace sym))
-    (let [sym-ns-name (:namespace sym)
+    (some? (core/namespace sym))
+    (let [sym-ns-name (core/namespace sym)
           sym-ns (get (:ns-registry ctx) (core/symbol sym-ns-name))]
       (if (some? sym-ns)
         (let [bindings (:bindings sym-ns)
-              sym-name (:name sym)
+              sym-name (core/name sym)
               simp-sym (core/symbol sym-name)]
           (assert (map? bindings) "namespace bindings must be a map")
           (if (contains? bindings simp-sym)
@@ -345,8 +345,8 @@
       "def! expects a simple symbol as the first argument")
     (assert (= (count args) 2) "def! expects 2 arguments")
     (let [[val-expr val-body ctx2] (transform ctx value-form)
-          munged (munge-symbol (core/symbol (:name current-ns)
-                                            (:name name)))]
+          munged (munge-symbol (core/symbol (core/name current-ns)
+                                            (core/name name)))]
       [[:value munged]
        (concat
          val-body
@@ -366,8 +366,8 @@
     (let [[res body ctx*] (transform ctx f)
           current-ns (:current-ns ctx)
           _ (assert (some? current-ns) "no current namespace")
-          python-name (munge-symbol (core/symbol (:name current-ns)
-                                                 (:name name)))]
+          python-name (munge-symbol (core/symbol (core/name current-ns)
+                                                 (core/name name)))]
       [[:value python-name]
        (concat
          body
@@ -468,7 +468,7 @@
       (let [param (first params)]
         (assert (core/simple-symbol? param)
           "function parameter must be a simple symbol")
-        (if (= (:name param) "&")
+        (if (= (core/name param) "&")
           (let [variadic-param (second params)
                 _ (assert (core/simple-symbol? variadic-param)
                     "variadic parameter must be a simple symbol")
@@ -509,7 +509,7 @@
       (number? x) [:value (core/str x)]
       (string? x) [:value (core/pr-str x)]
       (core/keyword? x) [:call [:value (resolve* "keyword")]
-                          [:value (core/pr-str (:name x))]]
+                          [:value (core/pr-str (core/name x))]]
       (core/symbol? x) [:call [:value (resolve* "symbol")]
                          [:value (core/str "\"" x "\"")]]
       (list? x) (concat [:call [:value (resolve* "list")]]
@@ -622,7 +622,7 @@
                                (assert (core/simple-symbol? name)
                                  "imported name must be a simple symbol")
                                [name {:python-name (str imports "."
-                                                        (:name name))}])
+                                                        (core/name name))}])
                              names)))]
         (recur (rest specs*) body* ctx3)))))
 

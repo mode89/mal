@@ -2,8 +2,7 @@
   (:refer-clojure :exclude [atom comment keyword newline symbol])
   (:require [mal.parsing :as pa]
             [mal.core :as core])
-  (:import [mal.parsing Value]
-           [mal.core Keyword]))
+  (:import [mal.parsing Value]))
 
 (defrecord Token [value line column])
 (defrecord Comment [text])
@@ -151,7 +150,7 @@
             (pa/return value)
             (pa/fail (str "invalid number: " id)))
         (= \: id0)
-          (pa/return (new Keyword (apply str (rest id))))
+          (pa/return (core/keyword (apply str (rest id))))
         :else
           (pa/return (core/symbol id))))))
 

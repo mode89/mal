@@ -24,9 +24,10 @@
                      :ns-registry
                      core/deref
                      (map (fn [[ns-name ns]]
-                            [(:name ns-name) (sample-namespace ns)]))
+                            [(core/name ns-name) (sample-namespace ns)]))
                      (into {}))
-   :current-ns (-> ctx core/deref :current-ns :name :name)})
+   :current-ns (when-some [ns (-> ctx core/deref :current-ns)]
+                 (core/name (:name ns)))})
 
 (defn mock-ns [name bindings]
   (core/->Namespace (core/symbol name) (core/atom bindings)))

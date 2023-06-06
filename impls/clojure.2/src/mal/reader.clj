@@ -3,8 +3,7 @@
   (:require [mal.lexer :as l]
             [mal.parsing :as pa]
             [mal.core :as core])
-  (:import [mal.parsing ParseError Value]
-           [mal.core Keyword]))
+  (:import [mal.parsing ParseError Value]))
 
 (def any-token
   (pa/make-parser [tokens]
@@ -35,7 +34,7 @@
               (string? v)
               (number? v)
               (core/symbol? v)
-              (instance? Keyword v)))
+              (core/keyword? v)))
         (pa/map
           (fn [t] (:value t))
           any-token)))))
