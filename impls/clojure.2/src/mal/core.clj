@@ -21,6 +21,7 @@
 (def ^:macro condp #'clojure.core/condp)
 (def ^:macro -> #'clojure.core/->)
 (def ^:macro loop #'clojure.core/loop)
+(def ^:macro doseq #'clojure.core/doseq)
 
 (def concat clojure.core/concat)
 (def partition clojure.core/partition)
