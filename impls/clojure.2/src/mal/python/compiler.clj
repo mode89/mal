@@ -437,7 +437,7 @@
             "let* expects even number of forms in bindings")
     (assert (> 3 (count args))
             "let* expects only one form in body")
-    [[:call temp-func]
+    [[:call [:value temp-func]]
      [[:def temp-func []
         temp-func-body]]
      ctx3]))

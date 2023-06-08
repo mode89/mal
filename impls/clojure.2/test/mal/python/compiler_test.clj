@@ -507,12 +507,12 @@
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}
               :current-ns "foo")]
-    (is (= [[:call (c/temp-name 0)]
+    (is (= [[:call [:value (c/temp-name 0)]]
             [[:def (c/temp-name 0) []
                [:block [:return [:value "None"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx (list 'let* []))))
-    (is (= [[:call (c/temp-name 0)]
+    (is (= [[:call [:value (c/temp-name 0)]]
             [[:def (c/temp-name 0) []
                [:block
                  [:assign [:value "a"] [:value "42"]]
@@ -521,7 +521,7 @@
            (c/transform ctx
              (let$ ['a 42]
                'a))))
-    (is (= [[:call (c/temp-name 0)]
+    (is (= [[:call [:value (c/temp-name 0)]]
             [[:def (c/temp-name 0) []
                [:block
                  [:assign (c/globals (munge* "foo" "b")) [:value "42"]]
@@ -540,7 +540,7 @@
                (do$
                  'a
                  'c)))))
-    (is (= [[:call (c/temp-name 0)]
+    (is (= [[:call [:value (c/temp-name 0)]]
             [[:def (c/temp-name 0) []
                [:block
                  [:assign [:value "a"] [:value "42"]]
