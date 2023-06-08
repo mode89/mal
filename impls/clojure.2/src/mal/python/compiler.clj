@@ -105,7 +105,8 @@
 (defn expression? [ast]
   (let [tag (first ast)]
     (or (= :value tag)
-        (= :call tag))))
+        (= :call tag)
+        (= :dot tag))))
 
 (defn emit-assign [left right]
   (assert-symbol left)
@@ -219,6 +220,13 @@
       :value (let [value (second ast)]
                (assert (string? value))
                [value])
+      :dot (let [[obj attr] (rest ast)]
+             (assert (= (count ast) 3) ":dot expects 2 arguments")
+             (assert (expression? obj)
+               "First argument to :dot must be an expression")
+             (assert (string? attr)
+               "Second argument to :dot must be a string")
+             [(str (first (emit obj)) "." attr)])
       ; A list of statements. Can't be empty.
       :block (let [statements (rest ast)]
                (assert (seq statements))

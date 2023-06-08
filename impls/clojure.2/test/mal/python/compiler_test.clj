@@ -293,6 +293,10 @@
           "  l = m"
           "  return n"])))
 
+(deftest emit-dot
+  (is (= (c/emit [:dot [:value "foo"] "bar"])
+         ["foo.bar"])))
+
 (deftest munge-name
   (is (= "foo_bar" (c/munge-name "foo-bar")))
   (is (= "_PLUS_bar" (c/munge-name "+bar")))
