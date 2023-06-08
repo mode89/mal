@@ -110,6 +110,7 @@
   (let [tag (first ast)]
     (or (= :value tag)
         (= :call tag)
+        (= :string tag)
         (= :dot tag)
         (= :subscript tag))))
 
@@ -225,6 +226,9 @@
       :value (let [value (second ast)]
                (assert (string? value))
                [value])
+      :string (let [value (second ast)]
+                (assert (string? value))
+                [(core/str \" value \")])
       :dot (let [[obj attr] (rest ast)]
              (assert (= (count ast) 3) ":dot expects 2 arguments")
              (assert (expression? obj)
@@ -322,7 +326,7 @@
 
 (defn globals [name]
   (assert (string? name))
-  [:subscript [:call [:value "globals"]] [:value (str "\"" name "\"")]])
+  [:subscript [:call [:value "globals"]] [:string name]])
 
 (defn- throw-not-found [sym]
   (core/throw (core/str "'" sym "' not found")))
@@ -532,11 +536,14 @@
       (nil? x) [:value "None"]
       (boolean? x) [:value (if x "True" "False")]
       (number? x) [:value (core/str x)]
-      (string? x) [:value (core/pr-str x)]
+      (string? x) [:string x]
       (core/keyword? x) [:call [:value (resolve* "keyword")]
-                          [:value (core/pr-str (core/name x))]]
+                          (if-some [ns (core/namespace x)]
+                            [:string ns]
+                            [:value "None"])
+                          [:string (core/name x)]]
       (core/symbol? x) [:call [:value (resolve* "symbol")]
-                         [:value (core/str "\"" x "\"")]]
+                         [:string (core/str x)]]
       (list? x) (concat [:call [:value (resolve* "list")]]
                         (map #(quote-expr ctx %) x))
       (core/vector? x) (concat [:call [:value (resolve* "vector")]]
@@ -639,7 +646,7 @@
             body* (conj body
                     [:assign [:value imports]
                       [:call [:value "__import__"]
-                        [:value (core/str "\"" module "\"")]]])
+                        [:string (core/str module)]]])
             ctx3 (update-in ctx2 [:ns-registry (:current-ns ctx2) :bindings]
                    merge (into {}
                            (map

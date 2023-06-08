@@ -293,6 +293,10 @@
           "  l = m"
           "  return n"])))
 
+(deftest emit-string
+  (is (= ["\"foo\""]
+         (c/emit [:string "foo"]))))
+
 (deftest emit-dot
   (is (= (c/emit [:dot [:value "foo"] "bar"])
          ["foo.bar"])))
@@ -418,7 +422,7 @@
 (deftest transform
   (let [ctx (mock-compile-context)]
     (is (= [[:value "42"] nil ctx] (c/transform ctx 42)))
-    (is (= [[:value "\"42\""] nil ctx] (c/transform ctx "42")))
+    (is (= [[:string "42"] nil ctx] (c/transform ctx "42")))
     (is (= [[:value "None"] nil ctx] (c/transform ctx nil)))
     (is (= [[:value "True"] nil ctx] (c/transform ctx true)))
     (is (= [[:value "False"] nil ctx] (c/transform ctx false))))
@@ -751,21 +755,23 @@
     (is (= [[:value "False"] nil ctx] (c/transform ctx (quote$ false))))
     (is (= [[:value "42"] nil ctx] (c/transform ctx (quote$ 42))))
     (is (= [[:value "3.14"] nil ctx] (c/transform ctx (quote$ 3.14))))
-    (is (= [[:value "\"Hello, \\\"World\\\"!\""] nil ctx]
+    (is (= [[:string "Hello, \"World\"!"] nil ctx]
            (c/transform ctx (quote$ "Hello, \"World\"!"))))
-    (is (= [[:call [:value keyword*] [:value "\"foo\""]] nil ctx]
+    (is (= [[:call [:value keyword*] [:value "None"] [:string "foo"]] nil ctx]
            (c/transform ctx (quote$ :foo))))
-    (is (= [[:call [:value symbol*] [:value "\"foo/bar\""]] nil ctx]
+    (is (= [[:call [:value keyword*] [:string "bar"] [:string "baz"]] nil ctx]
+           (c/transform ctx (quote$ :bar/baz))))
+    (is (= [[:call [:value symbol*] [:string "foo/bar"]] nil ctx]
            (c/transform ctx (quote$ 'foo/bar))))
-    (is (= [[:call [:value symbol*] [:value "\"baz\""]] nil ctx]
+    (is (= [[:call [:value symbol*] [:string "baz"]] nil ctx]
            (c/transform ctx (quote$ 'baz))))
     (is (= [[:call [:value list*]] nil ctx]
            (c/transform ctx (quote$ (list)))))
     (is (= [[:call [:value list*]
               [:value "None"]
               [:value "43"]
-              [:value "\"hello\""]
-              [:call [:value symbol*] [:value "\"qux\""]]]
+              [:string "hello"]
+              [:call [:value symbol*] [:string "qux"]]]
             nil ctx]
            (c/transform ctx (quote$ (list nil 43 "hello" 'qux)))))
     (is (= [[:call [:value vector*]] nil ctx]
@@ -773,15 +779,15 @@
     (is (= [[:call [:value vector*]
               [:value "None"]
               [:value "43"]
-              [:value "\"hello\""]
-              [:call [:value symbol*] [:value "\"qux\""]]]
+              [:string "hello"]
+              [:call [:value symbol*] [:string "qux"]]]
             nil ctx]
            (c/transform ctx (quote$ [nil 43 "hello" 'qux]))))
     (is (= [[:call [:value hash-map*]] nil ctx]
            (c/transform ctx (quote$ {}))))
     (is (= [[:call [:value hash-map*]
-              [:value "\"hello\""]
-              [:call [:value symbol*] [:value "\"qux\""]]
+              [:string "hello"]
+              [:call [:value symbol*] [:string "qux"]]
               [:value "None"]
               [:value "43"]]
             nil ctx]
@@ -789,10 +795,10 @@
     (is (= [[:call [:value hash-set*]] nil ctx]
            (c/transform ctx (quote$ #{}))))
     (is (= [[:call [:value hash-set*]
-              [:value "\"hello\""]
+              [:string "hello"]
               [:value "43"]
               [:value "None"]
-              [:call [:value symbol*] [:value "\"qux\""]]]
+              [:call [:value symbol*] [:string "qux"]]]
             nil ctx]
            (c/transform ctx (quote$ #{nil 43 "hello" 'qux}))))
     (is (re-find #"quote expects one argument"
@@ -815,7 +821,7 @@
             ctx]
            (c/transform ctx (list 'baz 1 2 3))))
     (is (= [[:call [:value "qux"]
-              [:value "\"hello\""]
+              [:string "hello"]
               [:value (munge* "foo/a")]
               [:value (munge* "foo/bar")]]
             [[:assign (c/globals (munge* "foo/a")) [:value "43"]]]
@@ -855,7 +861,7 @@
         vec* (munge* "mal.core/vec")
         vector* (munge* "mal.core/vector")]
     (is (= [[:value "None"] nil ctx] (c/transform ctx (qq$ nil))))
-    (is (= [[:call [:value symbol*] [:value "\"a\""]] nil ctx]
+    (is (= [[:call [:value symbol*] [:string "a"]] nil ctx]
            (c/transform ctx (qq$ 'a))))
     (is (= [[:value (munge* "foo/bar")] nil ctx]
            (c/transform ctx (qq$ (unq$ 'bar)))))
@@ -864,7 +870,7 @@
     (is (= [[:call [:value concat*]
               [:call [:value list*]
                 [:value "42"]
-                [:call [:value symbol*] [:value "\"x\""]]]
+                [:call [:value symbol*] [:string "x"]]]
               [:value "qux"]]
             [] ctx]
            (c/transform ctx
@@ -872,7 +878,7 @@
     (is (= [[:call [:value concat*]
               [:value (munge* "foo/bar")]
               [:call [:value list*]
-                [:call [:value symbol*] [:value "\"fred\""]]
+                [:call [:value symbol*] [:string "fred"]]
                 [:value "42"]]]
             [] ctx]
            (c/transform ctx
@@ -1127,7 +1133,7 @@
               :current-ns "foo")]
     (is (= [[:call [:value (munge* "foo" "Bar")]] [] ctx]
            (c/transform ctx (list 'new 'Bar))))
-    (is (= [[:call [:value "Baz"] [:value "\"hello\""]]
+    (is (= [[:call [:value "Baz"] [:string "hello"]]
             [[:value "42"]
              [:value "1234"]]
             ctx]
@@ -1144,7 +1150,7 @@
         temp2 (c/temp-name 2)]
     (is (= [[:value "None"]
             [[:assign [:value temp0]
-               [:call [:value "__import__"] [:value "\"operator\""]]]]
+               [:call [:value "__import__"] [:string "operator"]]]]
             (-> ctx
                 (assoc :counter 1)
                 (update-in [:ns-registry 'foo :bindings]
@@ -1153,12 +1159,11 @@
              (list 'import ['operator 'is_]))))
     (is (= [[:value "None"]
             [[:assign [:value temp0]
-               [:call [:value "__import__"] [:value "\"funcy\""]]]
+               [:call [:value "__import__"] [:string "funcy"]]]
              [:assign [:value temp1]
-               [:call [:value "__import__"]
-                 [:value "\"persistent.typing\""]]]
+               [:call [:value "__import__"] [:string "persistent.typing"]]]
              [:assign [:value temp2]
-               [:call [:value "__import__"] [:value "\"unittest.mock\""]]]]
+               [:call [:value "__import__"] [:string "unittest.mock"]]]]
             (-> ctx
                 (assoc :counter 3)
                 (update-in [:ns-registry 'foo :bindings] merge
