@@ -3,7 +3,8 @@
             [mal.core :as core]))
 
 (def SPECIAL-NAMES
-  #{"False"
+  #{"__import__"
+    "False"
     "None"
     "True"
     "and"
@@ -28,6 +29,7 @@
     "import"
     "in"
     "is"
+    "isinstance"
     "lambda"
     "list"
     "map"
@@ -36,11 +38,13 @@
     "or"
     "pass"
     "raise"
+    "range"
     "return"
     "set"
     "setattr"
     "str"
     "try"
+    "type"
     "while"
     "with"
     "yield"})
