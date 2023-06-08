@@ -468,12 +468,12 @@
           (cons :block
             (concat
               then-body
-              [[:assign result then]]))
+              [[:assign [:value result] then]]))
           nil
           (cons :block
             (concat
               else-body
-              [[:assign result else]]))]])
+              [[:assign [:value result] else]]))]])
      ctx5]))
 
 (defn handle-fn-params [params]

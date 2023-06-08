@@ -587,19 +587,19 @@
     (is (= [[:value (c/temp-name 0)]
             [[:if [:value "True"]
                [:block
-                 [:assign (c/temp-name 0) [:value "42"]]]
+                 [:assign [:value (c/temp-name 0)] [:value "42"]]]
                nil
                [:block
-                 [:assign (c/temp-name 0) [:value "None"]]]]]
+                 [:assign [:value (c/temp-name 0)] [:value "None"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx (if$ true 42))))
     (is (= [[:value (c/temp-name 0)]
             [[:if [:value "False"]
                [:block
-                 [:assign (c/temp-name 0) [:value "43"]]]
+                 [:assign [:value (c/temp-name 0)] [:value "43"]]]
                nil
                [:block
-                 [:assign (c/temp-name 0) [:value "44"]]]]]
+                 [:assign [:value (c/temp-name 0)] [:value "44"]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx (if$ false 43 44))))
     (is (= [[:value (c/temp-name 0)]
@@ -607,11 +607,15 @@
              [:if [:value (munge* "foo" "b")]
                [:block
                  [:value (munge* "foo" "c")]
-                 [:assign (c/temp-name 0) [:value (munge* "foo" "d")]]]
+                 [:assign
+                   [:value (c/temp-name 0)]
+                   [:value (munge* "foo" "d")]]]
                nil
                [:block
                  [:value (munge* "foo" "e")]
-                 [:assign (c/temp-name 0) [:value (munge* "foo" "f")]]]]]
+                 [:assign
+                   [:value (c/temp-name 0)]
+                   [:value (munge* "foo" "f")]]]]]
             (assoc ctx :counter 1)]
            (c/transform ctx
              (if$ (do$ 'a 'b)
