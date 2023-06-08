@@ -309,7 +309,9 @@
   (is (= (core/pr-str) ""))
   (is (= (core/pr-str 1) "1"))
   (is (= (core/pr-str 1 2 3) "1 2 3"))
-  (is (= (core/pr-str "a\"b") "\"a\\\"b\"")))
+  (is (= (core/pr-str "a\"b") "\"a\\\"b\""))
+  (is (= ":" (core/pr-str \:)))
+  (is (= "\n" (core/pr-str \newline))))
 
 (deftest core-str
   (is (= (core/str) ""))
@@ -319,7 +321,8 @@
   (is (= (core/str "a\"b" 1 2 3) "a\"b123"))
   (is (= "123[4 5 6](7 8 9)" (core/str 1 2 3 [4 5 6] (list 7 8 9))))
   (is (= "" (core/str nil)))
-  (is (= "123" (core/str 1 nil 2 nil 3))))
+  (is (= "123" (core/str 1 nil 2 nil 3)))
+  (is (= ":foo/bar" (core/str \: "foo" \/ "bar"))))
 
 (deftest eval-tail-call-optimization
   (let [ctx (mock-eval-context

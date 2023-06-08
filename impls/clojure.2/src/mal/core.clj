@@ -46,6 +46,7 @@
 (def keyword? impl/keyword?)
 (def name impl/name)
 (def namespace impl/namespace)
+(def char? impl/char?)
 (def string? impl/string?)
 (def subs impl/subs)
 (def inc impl/inc)
@@ -514,6 +515,8 @@
     (boolean? object)
       (impl/to-string object)
     (number? object)
+      (impl/to-string object)
+    (char? object)
       (impl/to-string object)
     (string? object)
       (if print-readably

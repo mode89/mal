@@ -14,6 +14,7 @@
 (def name clojure.core/name)
 (def namespace clojure.core/namespace)
 (def to-string clojure.core/str)
+(def char? clojure.core/char?)
 (def string? clojure.core/string?)
 (def join clojure.string/join)
 (def index-of clojure.string/index-of)
