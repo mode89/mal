@@ -1219,6 +1219,36 @@
                        :current-ns "foo")
           (list 'inline-python [:value "bar"])))))
 
+(deftest transform-python-expression
+  (let [ctx (mock-compile-context
+              :ns-registry {"mal.python.impl" #{"foo"}}
+              :locals #{"bar"}
+              :current-ns "mal.python.impl")
+        foo* (munge* "mal.python.impl" "foo")]
+    (is (= [[:value "foo"] nil ctx]
+           (c/transform ctx (list '___python_expression "foo"))))
+    (is (= [[:value foo*] nil ctx]
+           (c/transform ctx (list '___python_expression 'foo))))
+    (is (= [[:value "bar"] nil ctx]
+           (c/transform ctx (list '___python_expression 'bar))))
+    (is (= [[:value (str foo* ".join(bar)")] nil ctx]
+           (c/transform ctx
+             (list '___python_expression 'foo ".join(" 'bar ")"))))
+    (is (= [[:value (str "bar[" foo* ":42]")] nil ctx]
+           (c/transform ctx
+             (list '___python_expression 'bar "[" 'foo ":42]"))))
+    (is (thrown-with-msg* #"expects at least one argument"
+          (c/transform ctx (list '___python_expression))))
+    (is (thrown-with-msg* #"'qux' not found"
+          (c/transform ctx (list '___python_expression 'qux))))
+    (is (thrown-with-msg* #"must be a symbol or a string"
+          (c/transform ctx (list '___python_expression 42)))))
+  (is (thrown-with-msg* #"isn't allowed outside of mal.python.impl"
+        (c/transform (mock-compile-context
+                       :ns-registry {"foo" #{}}
+                       :current-ns "foo")
+          (list '___python_expression [:value "bar"])))))
+
 (deftest switch-ns
   (is (= (mock-compile-context
            :ns-registry {"foo" #{"bar"}

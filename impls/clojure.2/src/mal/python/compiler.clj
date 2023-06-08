@@ -671,6 +671,21 @@
       "last argument of inline-python must be an expression")
     [result body ctx]))
 
+(defn transform-python-expression [ctx args]
+  (assert (>= (count args) 1)
+    "___python_expression expects at least one argument")
+  (assert (= (:current-ns ctx) 'mal.python.impl)
+    "___python_expression isn't allowed outside of mal.python.impl")
+  (let [resolv (fn [element]
+                 (cond
+                   (string? element) element
+                   (symbol? element) (resolve-symbol-name ctx element)
+                   :else (core/throw
+                           (str "Each argument of ___python_expression "
+                                "must be a symbol or a string"))))
+        result (apply str (map resolv args))]
+    [[:value result] nil ctx]))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -704,6 +719,7 @@
           'catch* (core/throw "catch* used outside of try*")
           'import (transform-import ctx args)
           'inline-python (transform-inline-python ctx args)
+          '___python_expression (transform-python-expression ctx args)
           (transform-call ctx form))))
 
     (core/symbol? form)
