@@ -297,6 +297,10 @@
   (is (= (c/emit [:dot [:value "foo"] "bar"])
          ["foo.bar"])))
 
+(deftest emit-subscript
+  (is (= (c/emit [:subscript [:value "foo"] [:value "bar"]])
+         ["foo[bar]"])))
+
 (deftest munge-name
   (is (= "foo_bar" (c/munge-name "foo-bar")))
   (is (= "_PLUS_bar" (c/munge-name "+bar")))

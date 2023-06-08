@@ -106,7 +106,8 @@
   (let [tag (first ast)]
     (or (= :value tag)
         (= :call tag)
-        (= :dot tag))))
+        (= :dot tag)
+        (= :subscript tag))))
 
 (defn emit-assign [left right]
   (assert-symbol left)
@@ -227,6 +228,14 @@
              (assert (string? attr)
                "Second argument to :dot must be a string")
              [(str (first (emit obj)) "." attr)])
+      :subscript (let [[obj item] (rest ast)]
+                   (assert (= (count ast) 3)
+                     ":subscript expects 2 arguments")
+                   (assert (expression? obj)
+                     "First argument to :subscript must be an expression")
+                   (assert (expression? item)
+                     "Second argument to :subscript must be an expression")
+                   [(str (first (emit obj)) "[" (first (emit item)) "]")])
       ; A list of statements. Can't be empty.
       :block (let [statements (rest ast)]
                (assert (seq statements))
@@ -305,7 +314,7 @@
 
 (defn globals [name]
   (assert (string? name))
-  [:value (str "globals()[\"" name "\"]")])
+  [:subscript [:call [:value "globals"]] [:value (str "\"" name "\"")]])
 
 (defn- throw-not-found [sym]
   (core/throw (core/str "'" sym "' not found")))
