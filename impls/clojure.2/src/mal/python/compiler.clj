@@ -273,7 +273,11 @@
                       [exception binding (emit body)])
                     excepts)
                (when (some? finally)
-                 (emit finally)))))))
+                 (emit finally))))
+      :raise (let [value (second ast)]
+               (assert (= (count ast) 2) ":raise expects 1 argument")
+               (assert (expression? value) ":raise expects an expression")
+               [(str "raise " (first (emit value)))]))))
 
 (defn switch-ns [ctx ns]
   (assert (core/simple-symbol? ns) "namespace name must be a simple symbol")
