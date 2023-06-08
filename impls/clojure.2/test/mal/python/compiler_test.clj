@@ -1120,6 +1120,21 @@
                    (list 'catch* 'ex2 'ex2)))
             (catch Exception e (core/object-exception-unwrap e)))))))
 
+(deftest transform-new
+  (let [ctx (mock-compile-context
+              :ns-registry {"foo" #{"Bar"}}
+              :locals #{"Baz"}
+              :current-ns "foo")]
+    (is (= [[:call [:value (munge* "foo" "Bar")]] [] ctx]
+           (c/transform ctx (list 'new 'Bar))))
+    (is (= [[:call [:value "Baz"] [:value "\"hello\""]]
+            [[:value "42"]
+             [:value "1234"]]
+            ctx]
+           (c/transform ctx (list 'new 'Baz (do$ 42 1234 "hello")))))
+    (is (thrown-with-msg* #"new expects a symbol as the first argument"
+          (c/transform ctx (list 'new "Bar"))))))
+
 (deftest transform-import
   (let [ctx (mock-compile-context
               :ns-registry {"foo" #{}}

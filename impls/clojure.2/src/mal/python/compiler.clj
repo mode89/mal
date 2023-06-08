@@ -651,6 +651,10 @@
                              names)))]
         (recur (rest specs*) body* ctx3)))))
 
+(defn transform-new [ctx type args]
+  (assert (symbol? type) "new expects a symbol as the first argument")
+  (transform-call ctx (cons type args)))
+
 (defn inline-python-resolve-symbols [ctx ast]
   (cond
     (symbol? ast)
@@ -725,6 +729,7 @@
                           (core/expand-quasiquote form*)))
           'try* (transform-try ctx args)
           'catch* (core/throw "catch* used outside of try*")
+          'new (transform-new ctx (first args) (rest args))
           'import (transform-import ctx args)
           'inline-python (transform-inline-python ctx args)
           '___python_expression (transform-python-expression ctx args)

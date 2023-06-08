@@ -66,7 +66,7 @@
 
 (def! symbol
   (fn* [ns name]
-    (Symbol ns name)))
+    (new Symbol ns name)))
 
 (def! symbol?
   (fn* [x]
@@ -83,7 +83,7 @@
 
 (def! keyword
   (fn* [ns name]
-    (Keyword ns name)))
+    (new Keyword ns name)))
 
 (def! keyword?
   (fn* [x]
@@ -253,7 +253,7 @@
 
 (def! atom
   (fn* [x]
-    (Atom x (Lock))))
+    (new Atom x (Lock))))
 
 (def! atom?
   (fn* [x]
