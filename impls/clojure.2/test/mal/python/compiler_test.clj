@@ -1168,6 +1168,49 @@
         (c/transform (mock-compile-context :current-ns nil)
           (list 'import ['foo 'bar])))))
 
+(deftest transform-inline-python
+  (let [ctx (mock-compile-context
+              :ns-registry {"mal.python.impl" #{"foo"}}
+              :locals #{"bar"}
+              :current-ns "mal.python.impl")
+        foo* (munge* "mal.python.impl" "foo")]
+    (is (= [[:value "foo"] nil ctx]
+           (c/transform ctx (list 'inline-python [:value "foo"]))))
+    (is (= [[:value "qux"]
+            [[:value "foo"]
+             [:call [:value "bar"] [:value "baz"]]]
+            ctx]
+           (c/transform ctx
+             (list 'inline-python
+               [:value "foo"]
+               [:call [:value "bar"] [:value "baz"]]
+               [:value "qux"]))))
+    (is (= [[:value foo*] nil ctx]
+           (c/transform ctx (list 'inline-python 'foo))))
+    (is (= [[:call [:value "bar"] {"foo" [:value foo*]}]
+            [[:call [:value foo*] {"bar" [:value "bar"]}]]
+            ctx]
+           (c/transform ctx
+             (list 'inline-python
+               [:call 'foo {"bar" 'bar}]
+               [:call 'bar {"foo" 'foo}]))))
+    (is (thrown-with-msg* #"inline-python expects at least one argument"
+          (c/transform ctx (list 'inline-python))))
+    (is (thrown-with-msg* #"last argument .* must be an expression"
+          (c/transform ctx
+            (list 'inline-python
+              [:value "foo"]
+              [:if [:value "bar"]
+                [:block
+                  [:value "baz"]]]))))
+    (is (thrown-with-msg* #"'qux' not found"
+          (c/transform ctx (list 'inline-python 'qux)))))
+  (is (thrown-with-msg* #"isn't allowed outside of mal.python.impl"
+        (c/transform (mock-compile-context
+                       :ns-registry {"foo" #{}}
+                       :current-ns "foo")
+          (list 'inline-python [:value "bar"])))))
+
 (deftest switch-ns
   (is (= (mock-compile-context
            :ns-registry {"foo" #{"bar"}

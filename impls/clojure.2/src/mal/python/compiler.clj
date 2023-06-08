@@ -626,6 +626,34 @@
                              names)))]
         (recur (rest specs*) body* ctx3)))))
 
+(defn inline-python-resolve-symbols [ctx ast]
+  (cond
+    (symbol? ast)
+    [:value (resolve-symbol-name ctx ast)]
+
+    (coll? ast)
+    (cond
+      (sequential? ast) (map #(inline-python-resolve-symbols ctx %) ast)
+      (map? ast) (into {}
+                   (map (fn [[k v]]
+                          [(inline-python-resolve-symbols ctx k)
+                           (inline-python-resolve-symbols ctx v)])
+                        ast))
+      :else (throw (Exception. "Unsupported collection type")))
+
+    :else ast))
+
+(defn transform-inline-python [ctx args]
+  (assert (>= (count args) 1) "inline-python expects at least one argument")
+  (assert (= (:current-ns ctx) 'mal.python.impl)
+    "inline-python isn't allowed outside of mal.python.impl namespace")
+  (let [args* (inline-python-resolve-symbols ctx args)
+        result (last args*)
+        body (butlast args*)]
+    (assert (expression? result)
+      "last argument of inline-python must be an expression")
+    [result body ctx]))
+
 (defn transform
   "Transform lisp AST into python AST"
   [ctx form]
@@ -658,6 +686,7 @@
           'try* (transform-try ctx args)
           'catch* (core/throw "catch* used outside of try*")
           'import (transform-import ctx args)
+          'inline-python (transform-inline-python ctx args)
           (transform-call ctx form))))
 
     (core/symbol? form)
