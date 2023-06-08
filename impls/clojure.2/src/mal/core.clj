@@ -174,7 +174,7 @@
     \newline "\\n"
     \tab     "\\t"
     \\       "\\\\"
-    ch))
+    (impl/to-string ch)))
 
 (defn map [f coll]
   (impl/map
@@ -512,59 +512,57 @@
     (nil? object)
       "nil"
     (boolean? object)
-      (impl/str object)
+      (impl/to-string object)
     (number? object)
-      (impl/str object)
+      (impl/to-string object)
     (string? object)
       (if print-readably
-        (apply impl/str
-          (concat [\"] (map -pr-char-readable object) [\"]))
+        (impl/join "" (concat ["\""] (map -pr-char-readable object) ["\""]))
         object)
     (symbol? object)
-      (impl/str
-        (when-some [ns (namespace object)]
-          (str ns "/"))
-        (name object))
+      (str (when-some [ns (namespace object)]
+             (str ns "/"))
+           (name object))
     (keyword? object)
-      (impl/str \:
-                (when-some [ns (namespace object)]
-                  (str ns "/"))
-                (name object))
+      (str \:
+           (when-some [ns (namespace object)]
+             (str ns "/"))
+           (name object))
     (list? object)
-      (impl/str \(
+      (str \(
            (impl/join " "
              (map (fn [x]
                     (pr-str* x print-readably))
                   object))
            \) )
     (vector? object)
-      (impl/str \[
+      (str \[
            (impl/join " "
              (map (fn [x]
                     (pr-str* x print-readably))
                   object))
            \] )
     (map? object)
-      (impl/str \{
+      (str \{
            (impl/join " "
              (map (fn [x]
                     (pr-str* x print-readably))
                   (apply concat (seq object))))
            \} )
     (fn? object)
-      (impl/str "#function[" (impl/str object) "]")
+      (str "#function[" (impl/to-string object) "]")
     (macro? object)
-      (impl/str "#macro[" (impl/str object) "]")
+      (str "#macro[" (impl/to-string object) "]")
     (atom? object)
-      (impl/str "(atom " (deref object) ")")
+      (str "(atom " (deref object) ")")
     (instance? Namespace object)
-      (impl/str "#namespace[" (-> object :name name) "]")
+      (str "#namespace[" (-> object :name name) "]")
     :else
-      (impl/str "#object["
-                (impl/str (type object))
-                " "
-                (impl/str object)
-                "]")))
+      (str "#object["
+           (impl/to-string (type object))
+           " "
+           (impl/to-string object)
+           "]")))
 
 (defn pr-str [& args]
   (impl/join " "

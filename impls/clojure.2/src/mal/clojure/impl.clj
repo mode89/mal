@@ -13,7 +13,7 @@
 (def keyword? clojure.core/keyword?)
 (def name clojure.core/name)
 (def namespace clojure.core/namespace)
-(def str clojure.core/str)
+(def to-string clojure.core/str)
 (def string? clojure.core/string?)
 (def join clojure.string/join)
 (def index-of clojure.string/index-of)
@@ -114,7 +114,7 @@
   (clojure.core/let [m (meta x)
         tag (:tag m)
         prefix (if (clojure.core/some? tag)
-                 (str tag)
+                 (to-string tag)
                  nil)]
     `(clojure.core/let [x# ~x
            prefix# ~prefix]
