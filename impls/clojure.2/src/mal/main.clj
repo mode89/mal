@@ -21,7 +21,7 @@
 
 (defn -main [& args]
   (try
-    (let [content (slurp "src/mal/python/impl.clj")]
+    (let [content (slurp "src/mal/python/core.clj")]
       (loop [forms (read-string* content)
              ctx (pyc/map->CompileContext
                    {:ns-registry {}

@@ -682,8 +682,8 @@
 
 (defn transform-inline-python [ctx args]
   (assert (>= (count args) 1) "inline-python expects at least one argument")
-  (assert (= (:current-ns ctx) 'mal.python.impl)
-    "inline-python isn't allowed outside of mal.python.impl namespace")
+  (assert (= (:current-ns ctx) 'mal.core)
+    "inline-python isn't allowed outside of mal.core namespace")
   (let [args* (inline-python-resolve-symbols ctx args)
         result (last args*)
         body (butlast args*)]
@@ -694,8 +694,8 @@
 (defn transform-python-expression [ctx args]
   (assert (>= (count args) 1)
     "___python_expression expects at least one argument")
-  (assert (= (:current-ns ctx) 'mal.python.impl)
-    "___python_expression isn't allowed outside of mal.python.impl")
+  (assert (= (:current-ns ctx) 'mal.core)
+    "___python_expression isn't allowed outside of mal.core")
   (let [resolv (fn [element]
                  (cond
                    (string? element) element

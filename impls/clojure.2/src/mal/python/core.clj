@@ -1,4 +1,4 @@
-(in-ns 'mal.python.impl)
+(in-ns 'mal.core)
 
 (import [dataclasses make_dataclass])
 (import [pyrsistent plist pmap pvector pset PVector PList PMap PSet])
@@ -11,39 +11,39 @@
   (fn* [x y]
     (___python_expression x " is " y)))
 
-(def! equal?
+(def! =
   (fn* [left right]
     (___python_expression left " == " right)))
 
-(def! greater?
+(def! >
   (fn* [left right]
     (___python_expression left " > " right)))
 
-(def! less?
+(def! <
   (fn* [left right]
     (___python_expression left " < " right)))
 
-(def! greater-equal?
+(def! >=
   (fn* [left right]
     (___python_expression left " >= " right)))
 
-(def! less-equal?
+(def! <=
   (fn* [left right]
     (___python_expression left " <= " right)))
 
-(def! plus
+(def! +
   (fn* [left right]
     (___python_expression left " + " right)))
 
-(def! minus
+(def! -
   (fn* [left right]
     (___python_expression left " - " right)))
 
-(def! multiply
+(def! *
   (fn* [left right]
     (___python_expression left " * " right)))
 
-(def! divide
+(def! /
   (fn* [left right]
     (___python_expression left " / " right)))
 
@@ -75,7 +75,7 @@
 (def! simple-symbol?
   (fn* [x]
     (if (symbol? x)
-      (equal? (___python_expression x ".namespace") nil)
+      (= (___python_expression x ".namespace") nil)
       false)))
 
 (def! Keyword
@@ -217,7 +217,7 @@
 (def! object-exception?
   (fn* [ex]
     (if (instance? (___python_expression "Exception") ex)
-      (if (equal? (___python_expression "len(" ex ".args)") 1)
+      (if (= (___python_expression "len(" ex ".args)") 1)
         (instance? ObjectException (___python_expression ex ".args[0]"))
         false)
       false)))

@@ -1207,10 +1207,10 @@
 
 (deftest transform-inline-python
   (let [ctx (mock-compile-context
-              :ns-registry {"mal.python.impl" #{"foo"}}
+              :ns-registry {"mal.core" #{"foo"}}
               :locals #{"bar"}
-              :current-ns "mal.python.impl")
-        foo* (munge* "mal.python.impl" "foo")]
+              :current-ns "mal.core")
+        foo* (munge* "mal.core" "foo")]
     (is (= [[:value "foo"] nil ctx]
            (c/transform ctx (list 'inline-python [:value "foo"]))))
     (is (= [[:value "qux"]
@@ -1242,7 +1242,7 @@
                   [:value "baz"]]]))))
     (is (thrown-with-msg* #"'qux' not found"
           (c/transform ctx (list 'inline-python 'qux)))))
-  (is (thrown-with-msg* #"isn't allowed outside of mal.python.impl"
+  (is (thrown-with-msg* #"isn't allowed outside of mal.core"
         (c/transform (mock-compile-context
                        :ns-registry {"foo" #{}}
                        :current-ns "foo")
@@ -1250,10 +1250,10 @@
 
 (deftest transform-python-expression
   (let [ctx (mock-compile-context
-              :ns-registry {"mal.python.impl" #{"foo"}}
+              :ns-registry {"mal.core" #{"foo"}}
               :locals #{"bar"}
-              :current-ns "mal.python.impl")
-        foo* (munge* "mal.python.impl" "foo")]
+              :current-ns "mal.core")
+        foo* (munge* "mal.core" "foo")]
     (is (= [[:value "foo"] nil ctx]
            (c/transform ctx (list '___python_expression "foo"))))
     (is (= [[:value foo*] nil ctx]
@@ -1272,7 +1272,7 @@
           (c/transform ctx (list '___python_expression 'qux))))
     (is (thrown-with-msg* #"must be a symbol or a string"
           (c/transform ctx (list '___python_expression 42)))))
-  (is (thrown-with-msg* #"isn't allowed outside of mal.python.impl"
+  (is (thrown-with-msg* #"isn't allowed outside of mal.core"
         (c/transform (mock-compile-context
                        :ns-registry {"foo" #{}}
                        :current-ns "foo")
