@@ -1,5 +1,6 @@
-(ns mal.test.utils
-  (:require [mal.core :as core]))
+(ns mal.test.utils)
+
+(alias 'core 'mal.core)
 
 (defmacro catch-ex-info [& body]
   `(try

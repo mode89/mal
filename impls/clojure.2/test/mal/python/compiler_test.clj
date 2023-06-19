@@ -1,11 +1,12 @@
 (ns mal.python.compiler-test
   (:require [clojure.test :refer [deftest is]]
-            [mal.core :as core]
             [mal.python.compiler :as c]
             [mal.reader :as r]
             [mal.test.utils :refer [def$ defmacro$ do$ if$ fn$ let$ qq$
                                     quote$ spunq$ thrown-with-msg*
                                     unq$]]))
+
+(alias 'core 'mal.core)
 
 (defn munge*
   ([name]

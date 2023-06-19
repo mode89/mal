@@ -1,12 +1,13 @@
 (ns mal.reader-test
   (:require [clojure.string :refer [join]]
             [clojure.test :refer [deftest is]]
-            [mal.core :as core]
             [mal.lexer :as l]
             [mal.parsing :as pa]
             [mal.reader :as r]
             [mal.test.utils :refer [catch-ex-info]])
   (:import [mal.parsing ParseError]))
+
+(alias 'core 'mal.core)
 
 (deftest any-token
   (let [p (partial pa/run r/any-token)]

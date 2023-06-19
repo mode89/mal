@@ -1,8 +1,9 @@
 (ns mal.lexer
   (:refer-clojure :exclude [atom comment keyword newline symbol])
-  (:require [mal.parsing :as pa]
-            [mal.core :as core])
+  (:require [mal.parsing :as pa])
   (:import [mal.parsing Value]))
+
+(alias 'core 'mal.core)
 
 (defrecord Token [value line column])
 (defrecord Comment [text])

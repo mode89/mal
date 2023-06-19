@@ -2,9 +2,10 @@
   (:refer-clojure :exclude [comment])
   (:require [clojure.string :refer [join]]
             [clojure.test :refer [deftest is]]
-            [mal.core :as core]
             [mal.lexer :as l]
             [mal.test.utils :refer [catch-ex-info]]))
+
+(alias 'core 'mal.core)
 
 (deftest any-char
   (let [p (partial l/run l/any-char)]

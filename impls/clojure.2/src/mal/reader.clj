@@ -1,9 +1,10 @@
 (ns mal.reader
   (:refer-clojure :exclude [atom read-string])
   (:require [mal.lexer :as l]
-            [mal.parsing :as pa]
-            [mal.core :as core])
+            [mal.parsing :as pa])
   (:import [mal.parsing ParseError Value]))
+
+(alias 'core 'mal.core)
 
 (def any-token
   (pa/make-parser [tokens]

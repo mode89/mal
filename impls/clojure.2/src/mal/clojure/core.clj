@@ -1,112 +1,119 @@
 (in-ns 'mal.core)
 
-; >>> clojure specific
-
-(clojure.core/require 'mal.clojure.impl)
-(clojure.core/alias 'impl 'mal.clojure.impl)
-
+(def ^:macro defrecord #'clojure.core/defrecord)
 (def ^:macro defn #'clojure.core/defn)
+(def ^:macro fn #'clojure.core/fn)
+(def ^:macro let #'clojure.core/let)
+(def ^:macro declare #'clojure.core/declare)
 (def ^:macro or #'clojure.core/or)
 (def ^:macro and #'clojure.core/and)
 (def ^:macro assert #'clojure.core/assert)
-(def ^:macro let #'clojure.core/let)
-(def ^:macro defrecord #'impl/defrecord)
-(def ^:macro fn #'clojure.core/fn)
-(def ^:macro declare #'clojure.core/declare)
 (def ^:macro when #'clojure.core/when)
 (def ^:macro when-some #'clojure.core/when-some)
 (def ^:macro if-some #'clojure.core/if-some)
 (def ^:macro case #'clojure.core/case)
 (def ^:macro cond #'clojure.core/cond)
 (def ^:macro condp #'clojure.core/condp)
-(def ^:macro -> #'clojure.core/->)
 (def ^:macro loop #'clojure.core/loop)
 (def ^:macro doseq #'clojure.core/doseq)
+(def ^:macro -> #'clojure.core/->)
 
+(def identical? clojure.core/identical?)
+(def instance? clojure.core/instance?)
+(def symbol clojure.core/symbol)
+(def symbol? clojure.core/symbol?)
+(def simple-symbol? clojure.core/simple-symbol?)
+(def keyword clojure.core/keyword)
+(def keyword? clojure.core/keyword?)
+(def name clojure.core/name)
+(def namespace clojure.core/namespace)
+(def char? clojure.core/char?)
+(def string? clojure.core/string?)
+(def join clojure.string/join)
+(def index-of clojure.string/index-of)
+(def subs clojure.core/subs)
+(def inc clojure.core/inc)
+(def atom clojure.core/atom)
+(def deref clojure.core/deref)
+(def reset! clojure.core/reset!)
+(def boolean? clojure.core/boolean?)
+(def number? clojure.core/number?)
+(def list clojure.core/list)
+(def vec clojure.core/vec)
+(def vector clojure.core/vector)
+(def vector? clojure.core/vector?)
+(def hash-map clojure.core/hash-map)
+(def hash-set clojure.core/hash-set)
+(def set? clojure.core/set?)
+(def seq? clojure.core/seq?)
+(def seq clojure.core/seq)
+(def type clojure.core/type)
+(def meta clojure.core/meta)
+(def swap! clojure.core/swap!)
+(def assoc clojure.core/assoc)
+(def dissoc clojure.core/dissoc)
+(def contains? clojure.core/contains?)
+(def get clojure.core/get)
+(def empty? clojure.core/empty?)
+(def = clojure.core/=)
+(def > clojure.core/>)
+(def < clojure.core/<)
+(def >= clojure.core/>=)
+(def <= clojure.core/<=)
+(def + clojure.core/+)
+(def - clojure.core/-)
+(def * clojure.core/*)
+(def / clojure.core//)
+(def count clojure.core/count)
+(def reverse clojure.core/reverse)
+(def first clojure.core/first)
+(def second clojure.core/second)
+(def rest clojure.core/rest)
+(def cons clojure.core/cons)
+(def drop clojure.core/drop)
+(def nth clojure.core/nth)
+(def map clojure.core/map)
+(def reduce clojure.core/reduce)
+(def reduce-kv clojure.core/reduce-kv)
+(def into clojure.core/into)
 (def concat clojure.core/concat)
 (def partition clojure.core/partition)
 (def partition-by clojure.core/partition-by)
 (def butlast clojure.core/butlast)
 (def last clojure.core/last)
-
-; <<< clojure specific
+(def even? clojure.core/even?)
+(def print clojure.core/print)
+(def slurp clojure.core/slurp)
 
 (defrecord Function [macro? params body context make-locals])
 (defrecord Namespace [name bindings])
 (defrecord EvalContext [ns-registry current-ns])
 
-(def identical? impl/identical?)
-(def instance? impl/instance?)
-(def type impl/type)
-(def throw impl/throw)
-(def meta impl/meta)
-(def symbol impl/symbol)
-(def symbol? impl/symbol?)
-(def simple-symbol? impl/simple-symbol?)
-(def keyword impl/keyword)
-(def keyword? impl/keyword?)
-(def name impl/name)
-(def namespace impl/namespace)
-(def char? impl/char?)
-(def string? impl/string?)
-(def subs impl/subs)
-(def inc impl/inc)
-(def boolean? impl/boolean?)
-(def number? impl/number?)
-(def atom impl/atom)
-(def atom? impl/atom?)
-(def deref impl/deref)
-(def reset! impl/reset!)
-(def list impl/list)
-(def list? impl/list?)
-(def vec impl/vec)
-(def vector impl/vector)
-(def vector? impl/vector?)
-(def hash-map impl/hash-map)
-(def map? impl/map?)
-(def hash-set impl/hash-set)
-(def set? impl/set?)
-(def seq impl/seq)
-(def seq? impl/seq?)
-(def = impl/equal?)
-(def > impl/greater?)
-(def < impl/less?)
-(def >= impl/greater-equal?)
-(def <= impl/less-equal?)
-(def + impl/plus)
-(def - impl/minus)
-(def * impl/multiply)
-(def / impl/divide)
-(def assoc impl/assoc)
-(def dissoc impl/dissoc)
-(def contains? impl/contains?)
-(def get impl/get)
-(def empty? impl/empty?)
-(def count impl/count)
-(def reverse impl/reverse)
-(def first impl/first)
-(def second impl/second)
-(def rest impl/rest)
-(def cons impl/cons)
-(def drop impl/drop)
-(def nth impl/nth)
-(def reduce impl/reduce)
-(def reduce-kv impl/reduce-kv)
-(def into impl/into)
-(def keys impl/keys)
-(def vals impl/vals)
-(def even? impl/even?)
-(def print impl/print)
-(def slurp impl/slurp)
-
-(def object-exception impl/object-exception)
-(def object-exception? impl/object-exception?)
-(def object-exception-unwrap impl/object-exception-unwrap)
-
 (declare eval)
 (declare map)
 (declare pr-str)
 (declare str)
+
+(def OBJECT-EXCEPTION (new Object))
+
+(defn object-exception [obj]
+  (clojure.core/ex-info "object exception"
+    {:object obj :tag OBJECT-EXCEPTION}))
+
+(defn object-exception? [ex]
+  (clojure.core/and
+    (instance? clojure.lang.ExceptionInfo ex)
+    (clojure.core/=
+      OBJECT-EXCEPTION
+      (clojure.core/-> ex clojure.core/ex-data :tag))))
+
+(defn object-exception-unwrap [ex]
+  (clojure.core/-> ex clojure.core/ex-data :object))
+
+(defn throw [obj]
+  (if (instance? Throwable obj)
+    (throw obj)
+    (throw (object-exception obj))))
 
 (defn nil? [x]
   (identical? x nil))
@@ -126,11 +133,22 @@
 (defn fn? [x]
   (or (and (instance? Function x)
            (not (:macro? x)))
-      (impl/native-fn? x)))
+      (clojure.core/fn? x)))
 
 (defn macro? [x]
   (and (instance? Function x)
        (:macro? x)))
+
+(defn atom? [x]
+  (instance? clojure.lang.Atom x))
+
+(defn list? [x]
+  (clojure.core/seq? x))
+
+(defn map? [x]
+  (clojure.core/or
+    (instance? clojure.lang.PersistentArrayMap x)
+    (instance? clojure.lang.PersistentHashMap x)))
 
 (defn sequential? [x]
   (or (list? x)
@@ -143,6 +161,16 @@
       (map? x)
       (set? x)
       (seq? x)))
+
+(defn keys [m]
+  (if (empty? m)
+    (list)
+    (clojure.core/keys m)))
+
+(defn vals [m]
+  (if (empty? m)
+    (list)
+    (clojure.core/vals m)))
 
 (defn apply [f & args]
   (assert (> (count args) 0) "apply expects at least 2 arguments")
@@ -159,14 +187,14 @@
       (instance? Function f)
         (let [make-locals (:make-locals f)]
           (eval (atom (:context f)) (make-locals args*) (:body f)))
-      (impl/native-fn? f)
-        (impl/apply f args*)
+      (clojure.core/fn? f)
+        (clojure.core/apply f args*)
       :else
-        (impl/throw (str "Can't call this: " (pr-str f))))))
+        (mal.core/throw (str "Can't call this: " (pr-str f))))))
 
 (defn swap! [a f & args]
   (assert (atom? a))
-  (impl/swap! a
+  (clojure.core/swap! a
     (fn [x]
       (apply f x args))))
 
@@ -176,11 +204,11 @@
     \newline "\\n"
     \tab     "\\t"
     \\       "\\\\"
-    (impl/to-string ch)))
+    (clojure.core/str ch)))
 
 (defn map [f coll]
-  (impl/map
-    (if (impl/native-fn? f)
+  (clojure.core/map
+    (if (clojure.core/fn? f)
       f
       (fn [x]
         (apply f (list x))))
@@ -207,7 +235,7 @@
         new-ns))))
 
 (defn throw-not-found [sym]
-  (impl/throw (str "'" sym "' not found")))
+  (mal.core/throw (str "'" sym "' not found")))
 
 (defn resolve-symbol [ctx locals sym]
   (assert (symbol? sym) "must be a symbol")
@@ -221,7 +249,7 @@
         (if (contains? bindings simp-sym)
           (get bindings simp-sym)
           (throw-not-found sym)))
-      (impl/throw (str "namespace '" sym-ns-name "' not found")))
+      (mal.core/throw (str "namespace '" sym-ns-name "' not found")))
     (loop [locals* locals]
       (if (empty? locals*)
         (if-some [current-ns (-> ctx deref :current-ns)]
@@ -320,7 +348,7 @@
         unquoted)
 
       (= 'splice-unquote (first form))
-      (impl/throw "splice-unquote used outside of list context")
+      (mal.core/throw "splice-unquote used outside of list context")
 
       :else
       (expand-quasiquote-list form))
@@ -489,10 +517,11 @@
                       (recur (atom fctx)
                              (make-locals args)
                              (:body f)))
-                  (impl/native-fn? f)
-                    (impl/apply f args)
+                  (clojure.core/fn? f)
+                    (apply f args)
                   :else
-                    (impl/throw (str "Can't call this: " (pr-str f))))))))
+                    (mal.core/throw
+                      (str "Can't call this: " (pr-str f))))))))
       (symbol? form)
         (if (= '*ns* form)
           (-> ctx deref :current-ns)
@@ -514,14 +543,14 @@
     (nil? object)
       "nil"
     (boolean? object)
-      (impl/to-string object)
+      (clojure.core/str object)
     (number? object)
-      (impl/to-string object)
+      (clojure.core/str object)
     (char? object)
-      (impl/to-string object)
+      (clojure.core/str object)
     (string? object)
       (if print-readably
-        (impl/join "" (concat ["\""] (map -pr-char-readable object) ["\""]))
+        (join "" (concat ["\""] (map -pr-char-readable object) ["\""]))
         object)
     (symbol? object)
       (str (when-some [ns (namespace object)]
@@ -534,48 +563,48 @@
            (name object))
     (list? object)
       (str \(
-           (impl/join " "
+           (join " "
              (map (fn [x]
                     (pr-str* x print-readably))
                   object))
            \) )
     (vector? object)
       (str \[
-           (impl/join " "
+           (join " "
              (map (fn [x]
                     (pr-str* x print-readably))
                   object))
            \] )
     (map? object)
       (str \{
-           (impl/join " "
+           (join " "
              (map (fn [x]
                     (pr-str* x print-readably))
                   (apply concat (seq object))))
            \} )
     (fn? object)
-      (str "#function[" (impl/to-string object) "]")
+      (str "#function[" (clojure.core/str object) "]")
     (macro? object)
-      (str "#macro[" (impl/to-string object) "]")
+      (str "#macro[" (clojure.core/str object) "]")
     (atom? object)
       (str "(atom " (deref object) ")")
     (instance? Namespace object)
       (str "#namespace[" (-> object :name name) "]")
     :else
       (str "#object["
-           (impl/to-string (type object))
+           (clojure.core/str (type object))
            " "
-           (impl/to-string object)
+           (clojure.core/str object)
            "]")))
 
 (defn pr-str [& args]
-  (impl/join " "
+  (join " "
     (map (fn [x]
            (pr-str* x true))
          args)))
 
 (defn str [& args]
-  (impl/join ""
+  (join ""
     (map (fn [x]
            (if (some? x)
              (pr-str* x false)
@@ -588,8 +617,21 @@
 
 (defn println [& args]
   (print
-    (impl/join " "
+    (join " "
       (map (fn [x]
              (pr-str* x false))
            args)))
   (print \newline))
+
+(defn debug-macro [x]
+  (clojure.core/let [m (meta x)
+        tag (:tag m)
+        prefix (if (clojure.core/some? tag)
+                 (clojure.core/str tag)
+                 nil)]
+    `(clojure.core/let [x# ~x
+           prefix# ~prefix]
+       (if (clojure.core/some? prefix#)
+         (clojure.core/println prefix# x#)
+         (clojure.core/println x#))
+       x#)))

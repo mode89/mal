@@ -1,9 +1,12 @@
 (in-ns 'mal.main)
 
+(clojure.core/load "clojure/core")
+(clojure.core/refer 'mal.core :only
+  '[apply cons concat defn doseq empty? first get let loop println rest
+    second slurp str symbol = ->])
+
 (clojure.core/require
   '[clojure.stacktrace :refer [print-stack-trace]]
-  '[mal.core :refer [apply cons concat defn doseq empty? first get let loop
-                     println rest second slurp str symbol = ->]]
   '[mal.python.compiler :as pyc]
   '[mal.reader :refer [read-string*]])
 

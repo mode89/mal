@@ -1,6 +1,5 @@
 (ns mal.core-test
   (:require [clojure.test :refer [deftest is]]
-            [mal.core :as core]
             [mal.reader :as reader]
             [mal.test.utils :refer [is-list? is-vector? mock-eval-context
                                     mock-ns sample-eval-context
@@ -8,6 +7,8 @@
                                     fn$ defmacro$ do$ concat$ list$ try$
                                     throw$ thrown-with-msg*]])
   (:import [mal.core Function Namespace]))
+
+(alias 'core 'mal.core)
 
 (def common-bindings
   {'+ +

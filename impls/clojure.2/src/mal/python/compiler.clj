@@ -1,6 +1,7 @@
 (ns mal.python.compiler
-  (:require [clojure.string :refer [join triml]]
-            [mal.core :as core]))
+  (:require [clojure.string :refer [join triml]]))
+
+(alias 'core 'mal.core)
 
 (def SPECIAL-NAMES
   #{"__import__"
