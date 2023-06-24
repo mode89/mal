@@ -152,7 +152,7 @@
     :else
     form))
 
-(defn macroexpand [ctx locals form]
+(defn macroexpand-1 [ctx locals form]
   (if (list? form)
     (let [head (first form)]
       (if (symbol? head)
@@ -168,8 +168,23 @@
         form))
     form))
 
+(defn macroexpand [ctx locals form]
+  (loop [form* form]
+    (let [form** (macroexpand-1 ctx locals form*)]
+      (if (identical? form* form**)
+        form*
+        (recur form**)))))
+
+(defn macroexpand-all [ctx locals form]
+  (let [form* (macroexpand ctx locals form)]
+    (if (list? form*)
+      (let [head (first form*)
+            args (rest form*)]
+        (cons head (map #(macroexpand-all ctx locals %) args)))
+      form*)))
+
 (defn eval [ctx locals form0]
-  (let [form (macroexpand ctx locals form0)]
+  (let [form (macroexpand-1 ctx locals form0)]
     (cond
       (list? form)
         (if (empty? form)

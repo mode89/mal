@@ -511,14 +511,14 @@
                (list 'defmacro! 'foo (fn$ [] 42)))
           (catch Error e (.getMessage e))))))
 
-(deftest core-macroexpand
-  (is (= 42 (core/macroexpand (mock-eval-context) [] 42)))
-  (is (= (list 1 2) (core/macroexpand (mock-eval-context) [] (list 1 2))))
+(deftest core-macroexpand-1
+  (is (= 42 (core/macroexpand-1 (mock-eval-context) [] 42)))
+  (is (= (list 1 2) (core/macroexpand-1 (mock-eval-context) [] (list 1 2))))
   (is (= (list 'x 42)
-         (core/macroexpand (mock-eval-context) []
+         (core/macroexpand-1 (mock-eval-context) []
            (list 'x 42))))
   (is (= (list 'x 1)
-         (core/macroexpand (mock-eval-context) [{'x 2}]
+         (core/macroexpand-1 (mock-eval-context) [{'x 2}]
            (list 'x 1))))
   (let [ctx (mock-eval-context
               :ns-registry {"mal.core" common-bindings
@@ -530,8 +530,49 @@
           (qq$ (list (unq$ 'arg)
             (unq$ 'arg))))))
     (is (= (list 'x 'x)
-           (core/macroexpand ctx []
+           (core/macroexpand-1 ctx []
              (list 'dup 'x))))))
+
+(deftest core-macroexpand
+  (let [ctx (mock-eval-context
+              :ns-registry {"user" nil}
+              :current-ns "user")]
+    (core/eval ctx []
+      (do$ (defmacro$ "m1"
+             (fn$ (list)
+               (quote$ (list 'm2))))
+           (defmacro$ "m2"
+             (fn$ (list)
+               (quote$ (list 'm3))))
+           (defmacro$ "m3"
+             (fn$ (list)
+               42))))
+    (is (= 42 (core/macroexpand ctx [] (list 'm1))))))
+
+(deftest core-macroexpand-all
+  (let [ctx (mock-eval-context
+              :ns-registry {"mal.core" common-bindings
+                            "user" nil}
+              :current-ns "user")]
+    (core/eval ctx []
+      (do$ (defmacro$ "m1"
+             (fn$ (list)
+               (quote$ (list 'm2 (list 'm3)))))
+           (defmacro$ "m2"
+             (fn$ (list 'x)
+               (qq$ (list 'm4 (unq$ 'x)))))
+           (defmacro$ "m3"
+             (fn$ (list)
+               (quote$ (list 'm5 43))))
+           (defmacro$ "m4"
+             (fn$ (list 'x)
+               (qq$ (list 41 (unq$ 'x)))))
+           (defmacro$ "m5"
+             (fn$ (list 'x)
+               (qq$ (list 42 (unq$ 'x)))))))
+    (is (= (list 41 (list 42 43))
+           (core/macroexpand-all ctx []
+             (list 'm1))))))
 
 (deftest eval-macro
   (let [ctx (mock-eval-context
