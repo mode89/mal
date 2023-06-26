@@ -3,6 +3,7 @@
 (defrecord EvalContext [ns-registry current-ns])
 
 (declare list?)
+(declare map)
 (declare map?)
 (declare apply)
 

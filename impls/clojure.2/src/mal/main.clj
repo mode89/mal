@@ -2,8 +2,8 @@
 
 (clojure.core/load "clojure/core")
 (clojure.core/refer 'mal.core :only
-  '[apply cons concat defn doseq empty? first get let loop println rest
-    second slurp str symbol = ->])
+  '[apply atom cons concat defn doseq empty? first get let loop
+    map->EvalContext println rest second slurp str symbol = -> CORE-NS])
 
 (clojure.core/require
   '[clojure.stacktrace :refer [print-stack-trace]]
@@ -21,27 +21,30 @@
 
 (defn -main [& args]
   (try
-    (let [content (slurp "src/mal/python/core.clj")]
+    (let [content (slurp "src/mal/python/core.clj")
+          eval-ctx (map->EvalContext
+                     {:ns-registry (atom {(:name CORE-NS) CORE-NS})
+                      :current-ns CORE-NS})]
       (loop [forms (read-string* content)
-             ctx (pyc/map->CompileContext
-                   {:ns-registry {}
-                    :current-ns nil
-                    :locals {}
-                    :counter 10000})]
+             comp-ctx (pyc/map->CompileContext
+                        {:ns-registry {}
+                         :current-ns nil
+                         :locals {}
+                         :counter 10000})]
         (if (empty? forms)
           (println (color :green "******** Done ********"))
           (let [form (first forms)
                 head (first form)]
             (if (= 'in-ns head)
               (let [ns (-> form second second)]
-                (recur (rest forms) (pyc/switch-ns ctx ns)))
-              (let [[result body ctx*] (pyc/transform ctx form)]
+                (recur (rest forms) (pyc/switch-ns comp-ctx ns)))
+              (let [[result body comp-ctx*] (pyc/transform comp-ctx form)]
                 (println "form:" form)
                 (println "body:" body)
                 (println "result:" result)
                 (doseq [line (pyc/emit (cons :block body))]
                   (println (color :blue line)))
                 (println (color :blue (first (pyc/emit result))))
-                (recur (rest forms) ctx*)))))))
+                (recur (rest forms) comp-ctx*)))))))
     (catch Throwable ex
       (print-stack-trace ex))))

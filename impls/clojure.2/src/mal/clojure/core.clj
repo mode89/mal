@@ -2,6 +2,7 @@
 
 (def ^:macro defrecord #'clojure.core/defrecord)
 (def ^:macro defn #'clojure.core/defn)
+(def ^:macro defmacro #'clojure.core/defmacro)
 (def ^:macro fn #'clojure.core/fn)
 (def ^:macro let #'clojure.core/let)
 (def ^:macro declare #'clojure.core/declare)
@@ -72,7 +73,6 @@
 (def cons clojure.core/cons)
 (def drop clojure.core/drop)
 (def nth clojure.core/nth)
-(def map clojure.core/map)
 (def reduce clojure.core/reduce)
 (def reduce-kv clojure.core/reduce-kv)
 (def into clojure.core/into)
@@ -182,6 +182,8 @@
       (fn [x]
         (apply f (list x))))
     coll))
+
+(clojure.core/load "cross/core_ns")
 
 (defn debug-macro [x]
   (clojure.core/let [m (meta x)
